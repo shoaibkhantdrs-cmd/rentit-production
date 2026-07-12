@@ -1,17 +1,5 @@
-import { NextFunction, Request, Response } from "express";
-import { env } from "@/config/env";
-import { logger } from "@/utils/logger";
-
-export function errorHandler(
-  err: Error,
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
-) {
-  logger.error(err);
-
-  res.status(500).json({
-    error: "Internal Server Error",
-    message: env.isProduction ? undefined : err.message,
-  });
-}
+// Superseded by src/interfaces/http/middleware/errorHandler.ts in Phase 2.
+// Kept as a re-export (rather than deleted) because this sandbox's output
+// folder does not allow removing previously-written files -- see
+// docs/phase-2.md "Folder changes" for the full explanation.
+export { errorHandler } from "@/interfaces/http/middleware/errorHandler";
