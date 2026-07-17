@@ -102,7 +102,7 @@ function VerificationStatusContent() {
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
             </div>
-            <button type="submit" className="btn btn--primary" disabled={submitting || !file}>
+            <button type="submit" className="btn-v2 btn-v2--primary" disabled={submitting || !file}>
               {submitting ? "Submitting..." : "Submit for review"}
             </button>
           </form>

@@ -1,0 +1,31 @@
+Phase 6 Part 5 - backup-db.sh / restore-db.sh verification
+(run against the ACTUAL scripts, with pg_dump/pg_restore replaced by
+fake executables on PATH that simulate success/corruption/failure --
+the scripts' own control flow, argument validation, integrity checks,
+confirmation prompt, and retention logic are all real and unmodified)
+
+backup-db.sh:
+1. PASS - missing DATABASE_URL -> exit 1, no file written
+2. PASS - successful backup -> file created, "Backup OK" printed, exit 0
+3. PASS - pg_restore --list integrity check fails on a corrupt dump ->
+          partial file removed, exit 2 (never leaves a bad backup on disk)
+4. PASS - BACKUP_RETENTION_DAYS cleanup: a file older than the retention
+          window was deleted, a recent file and the new backup were kept
+
+restore-db.sh:
+5. PASS - no file argument -> usage message, exit 1
+6. PASS - nonexistent backup file path -> exit 1, no restore attempted
+7. PASS - corrupt backup detected by pre-restore pg_restore --list check
+          -> exit 2, pg_restore (the real restore command) never invoked
+8. PASS - happy path (SKIP_CONFIRM=1) -> integrity check passes, restore
+          invoked with --clean --if-exists --no-owner --no-privileges
+          --jobs=N --dbname=<url> <file>, exit 0
+9. PASS - typing anything other than "restore" at the confirmation
+          prompt aborts before touching the database, exit 1
+
+9/9 checks passed. Real pg_dump/pg_restore binaries are unavailable in
+this sandbox (no network to install postgresql-client, no root), so an
+actual against-a-live-Postgres round-trip could not be performed here --
+noted as a manual verification step in
+docs/phase-6-part5-backup-recovery.md's "Testing this in a real
+environment" section.

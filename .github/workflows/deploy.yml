@@ -1,0 +1,63 @@
+name: Deploy
+
+# Phase 6 Part 6 (CI/CD): deployment automation. Deliberately separate
+# from ci.yml/build-and-push -- a successful build must never
+# auto-deploy to production without a human choosing to (`workflow_dispatch`
+# is manual-only by default; the `environment: production` block below
+# additionally lets a GitHub repo require manual approval before this job
+# runs at all, configured in Settings -> Environments, not in this file).
+#
+# What this does: SSHes into a single Docker host already running
+# docker-compose.prod.yml (see docs/phase-6-part6-cicd.md "Deploy target"
+# for how that host gets provisioned in the first place -- this workflow
+# assumes it already exists, it does not create infrastructure), pulls
+# the images built by ci.yml's build-and-push job, and restarts the stack.
+#
+# Required repository secrets (Settings -> Secrets and variables ->
+# Actions) -- until these are set, this workflow will fail at the "Deploy
+# over SSH" step, which is expected and safe (it fails closed, not open):
+#   DEPLOY_HOST        e.g. 203.0.113.10 or deploy.example.com
+#   DEPLOY_USER        SSH user with docker permissions on that host
+#   DEPLOY_SSH_KEY     private key matching an authorized_keys entry there
+#   DEPLOY_PATH        absolute path to the repo checkout on that host,
+#                      e.g. /opt/rentit (must contain docker-compose.prod.yml
+#                      and a .env.production already populated -- this
+#                      workflow does not create or transfer secrets to it)
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (matches a tag pushed by ci.yml, e.g. sha-abc1234 or v1.0.0)"
+        required: true
+        default: latest
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_PATH }}"
+            export BACKEND_IMAGE="ghcr.io/${{ github.repository_owner }}/rentit-backend:${{ inputs.image_tag }}"
+            export FRONTEND_IMAGE="ghcr.io/${{ github.repository_owner }}/rentit-frontend:${{ inputs.image_tag }}"
+            docker compose -f docker-compose.prod.yml --env-file .env.production pull backend frontend
+            docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
+            # Give the new backend container a moment to boot, then verify
+            # it's actually serving traffic before declaring success --
+            # otherwise this workflow can report green while a broken
+            # image sits there in a crash loop.
+            sleep 10
+            curl --fail --silent --max-time 5 http://localhost:${BACKEND_PORT:-4000}/health/live
+
+      - name: Deployment summary
+        run: |
+          echo "Deployed image tag: ${{ inputs.image_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "See docs/phase-6-part5-backup-recovery.md if this deploy needs to be rolled back via a database restore." >> "$GITHUB_STEP_SUMMARY"

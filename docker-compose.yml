@@ -46,6 +46,54 @@ services:
       OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
       RATE_LIMIT_AUTH_WINDOW_MS: ${RATE_LIMIT_AUTH_WINDOW_MS:-900000}
       RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-10}
+      RATE_LIMIT_MESSAGING_WINDOW_MS: ${RATE_LIMIT_MESSAGING_WINDOW_MS:-60000}
+      RATE_LIMIT_MESSAGING_MAX: ${RATE_LIMIT_MESSAGING_MAX:-20}
+      # Phase 3: image upload + geocoding. Missing until this audit --
+      # without these forwarded, the container always fell back to
+      # rejecting uploads / skipping geocoding even with real credentials
+      # in .env, because docker-compose only injects vars listed here.
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      MAX_IMAGE_UPLOAD_BYTES: ${MAX_IMAGE_UPLOAD_BYTES:-10485760}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      # Phase 5: chat/notifications/WhatsApp providers. Same gap -- these
+      # existed in backend/src/config/env.ts but were never added here.
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-no-reply@rentit.example}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      # Phase 6 Part 1: Payments (Razorpay + Stripe).
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PAYMENT_CURRENCY: ${PAYMENT_CURRENCY:-INR}
+      FEATURED_LISTING_PRICE_AMOUNT: ${FEATURED_LISTING_PRICE_AMOUNT:-19900}
+      FEATURED_LISTING_DURATION_DAYS: ${FEATURED_LISTING_DURATION_DAYS:-7}
+      BOOST_LISTING_PRICE_AMOUNT: ${BOOST_LISTING_PRICE_AMOUNT:-9900}
+      BOOST_LISTING_DURATION_DAYS: ${BOOST_LISTING_DURATION_DAYS:-3}
+      RATE_LIMIT_WEBHOOK_WINDOW_MS: ${RATE_LIMIT_WEBHOOK_WINDOW_MS:-60000}
+      RATE_LIMIT_WEBHOOK_MAX: ${RATE_LIMIT_WEBHOOK_MAX:-120}
+      RATE_LIMIT_PAYMENT_ORDER_WINDOW_MS: ${RATE_LIMIT_PAYMENT_ORDER_WINDOW_MS:-600000}
+      RATE_LIMIT_PAYMENT_ORDER_MAX: ${RATE_LIMIT_PAYMENT_ORDER_MAX:-10}
+      # Phase 6 Part 4: Observability.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     volumes:
@@ -70,5 +118,39 @@ services:
       - /app/node_modules
     command: npm run dev -- --host
 
+  # --- Phase 6 Part 4: Observability (opt-in) ---------------------------------
+  # Not started by a plain `docker compose up` -- both are gated behind the
+  # "observability" profile so the default dev workflow stays lightweight.
+  # Bring them up with: docker compose --profile observability up
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: rentit_prometheus
+    restart: unless-stopped
+    profiles: ["observability"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: rentit_grafana
+    restart: unless-stopped
+    profiles: ["observability"]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change_me_before_production}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   postgres_data:
+  grafana_data:

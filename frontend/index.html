@@ -2,8 +2,35 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Premium redesign: Inter is the marketplace-grade sans-serif used
+         across the new design system (navbar, hero, cards, wizard). Loaded
+         via Google Fonts CDN -- no build step / npm package needed for a
+         font, consistent with "no new install unless truly necessary". -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <meta name="description" content="Search, list, and manage rental properties -- browse listings, message owners, and track applications." />
+    <meta name="theme-color" content="#2563eb" />
+
+    <!-- Phase 6 Part 7 (mobile/PWA): favicon + PWA manifest + icons. -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- iOS reads neither the manifest's icons nor its theme_color for
+         home-screen install -- it needs its own explicit tags. Without
+         these, "Add to Home Screen" on iOS falls back to a screenshot
+         thumbnail as the icon and opens inside Safari chrome instead of
+         standalone. -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="RentIt" />
+
     <title>RentIt</title>
   </head>
   <body>

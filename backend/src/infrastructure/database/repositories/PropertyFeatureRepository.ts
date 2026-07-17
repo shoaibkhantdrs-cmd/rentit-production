@@ -29,6 +29,15 @@ export class PropertyFeatureRepository implements IPropertyFeatureRepository {
     return result.rows.map(toEntity);
   }
 
+  async listForProperties(propertyIds: string[]): Promise<PropertyFeature[]> {
+    if (propertyIds.length === 0) return [];
+    const result = await this.pool.query<PropertyFeatureRow>(
+      "SELECT * FROM property_features WHERE property_id = ANY($1::uuid[]) ORDER BY property_id, feature_key",
+      [propertyIds],
+    );
+    return result.rows.map(toEntity);
+  }
+
   async setForProperty(propertyId: string, featureKeys: string[]): Promise<void> {
     const client = await this.pool.connect();
     try {

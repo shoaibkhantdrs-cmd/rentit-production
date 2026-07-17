@@ -28,6 +28,10 @@ export class InMemoryNotificationRepository implements INotificationRepository {
     return notification;
   }
 
+  async createMany(inputs: NewNotificationInput[]): Promise<Notification[]> {
+    return Promise.all(inputs.map((input) => this.create(input)));
+  }
+
   async listForUser(
     userId: string,
     options: ListNotificationsOptions,

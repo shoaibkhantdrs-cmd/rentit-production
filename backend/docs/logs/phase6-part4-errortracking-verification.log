@@ -1,0 +1,28 @@
+Phase 6 Part 4 - error tracking verification
+(run against copies of the ACTUAL production files, with @/ import paths
+rewritten to relative paths and pino/express/zod stubbed as minimal
+type-compatible shims -- logic under test is untouched)
+
+1) SentryErrorTracker.ts (node --experimental-transform-types) -- 7/7 PASS
+   - endpoint host correct (DSN -> https://<host>/api/<projectId>/store/)
+   - auth header has sentry_key
+   - event has 32-hex event_id
+   - exception message captured
+   - tags.route set
+   - user.id set
+   - environment set
+
+2) errorHandler.ts / createErrorHandler() factory (node --experimental-transform-types) -- 8/8 PASS
+   - 5xx AppError -> tracker.captureException called
+   - 5xx AppError -> correct response status
+   - 5xx AppError -> userId propagated from req.user.sub
+   - 4xx AppError -> tracker NOT called (expected flow, not an incident)
+   - 4xx AppError -> correct response status
+   - unhandled (non-AppError) Error -> tracker called
+   - unhandled Error -> statusCode 500 recorded in tracker context
+   - unhandled Error -> response status 500
+
+3) metrics.ts (node --experimental-transform-types) -- 6/6 PASS (see
+   phase6-part4-metrics-verification.log for detail)
+
+All 21/21 checks pass across the three Part 4 modules verified this way.

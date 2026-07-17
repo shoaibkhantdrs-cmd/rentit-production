@@ -1,0 +1,39 @@
+Phase 6 Part 9 - Final QA: performance audit re-pass over Parts 4-8
+
+Part 3 (docs/phase-6-part3-performance.md) already covered database
+indexes/API performance/React rendering/lazy loading/image optimization/
+caching/compression for the whole system through Part 2. This pass
+re-examined Parts 4-8's additions specifically for new performance
+concerns.
+
+Reviewed, no issues found:
+- metrics.ts (Part 4): recordRequest() is O(number of histogram buckets)
+  = O(10) per request, all in-memory Map operations -- negligible
+  overhead added to the request path, verified functionally correct in
+  Part 4's standalone test (6/6 checks) and re-verified this pass to
+  confirm no behavior change from the Part 9 timingSafeEqual fix (which
+  only touched metrics.routes.ts's auth check, not metrics.ts itself).
+- SentryErrorTracker (Part 4): fire-and-forget `fetch(...).catch(...)`,
+  never awaited by errorHandler.ts -- a slow or unreachable Sentry
+  endpoint cannot add latency to any actual HTTP response.
+- Backup scripts (Part 5): run out-of-band (cron/CI), never on the
+  request-serving path -- no application performance impact by
+  construction.
+- CI/CD (Part 6): build-and-push already uses cache-from/cache-to:
+  type=gha for both Docker image builds, meaningfully speeding up repeat
+  CI runs; not applicable to runtime app performance.
+- Mobile assets (Part 7): app icons/splash generated at reasonable file
+  sizes for their purpose (512px icon: 5KB, maskable 512px: 11KB, 2732px
+  splash: 51KB) -- none large enough to be a real bundle-size or load-time
+  concern, and none of them ship in the web bundle anyway (icons load
+  directly as static files; the mobile-assets/ source images are only
+  consumed by the native build process, never fetched by a browser).
+- Service worker (Part 7): cache-first strategy for the Vite-hashed
+  bundle reduces repeat-visit load time (no re-fetch of unchanged JS/CSS);
+  confirmed in Part 7's standalone test that this never applies to
+  API responses, so it cannot serve stale data in exchange for that
+  speed.
+
+No new performance issues found or fixed in this pass -- Parts 4-8 are
+observability/ops/mobile/documentation work, not request-path code, so
+this is a plausible and expected outcome rather than an incomplete audit.

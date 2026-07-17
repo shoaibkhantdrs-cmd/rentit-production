@@ -24,6 +24,13 @@ export class InMemoryPropertyFavoriteRepository implements IPropertyFavoriteRepo
     return this.favorites.has(this.key(propertyId, userId));
   }
 
+  async listFavoritedPropertyIds(userId: string, propertyIds: string[]): Promise<string[]> {
+    const idSet = new Set(propertyIds);
+    return Array.from(this.favorites.values())
+      .filter((f) => f.userId === userId && idSet.has(f.propertyId))
+      .map((f) => f.propertyId);
+  }
+
   async listPropertyIdsForUser(
     userId: string,
     page: number,

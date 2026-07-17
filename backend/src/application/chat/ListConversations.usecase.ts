@@ -38,26 +38,44 @@ export class ListConversationsUseCase {
       input.pageSize,
     );
 
-    const summaries: ConversationSummary[] = await Promise.all(
-      items.map(async (item) => {
-        const other = item.otherParticipantId
-          ? await this.userRepo.findById(item.otherParticipantId)
-          : null;
-        const property = item.conversation.propertyId
-          ? await this.propertyRepo.findById(item.conversation.propertyId)
-          : null;
+    // Perf fix: was 2 extra queries per row (findById for the other
+    // participant + findById for the property) -- up to ~200 extra round
+    // trips on a full 100-item page. Batch both instead, mirroring the
+    // same Map-join pattern PropertyDetailLoader.loadMany() and
+    // SearchProperties.usecase.ts already use.
+    const otherParticipantIds = [
+      ...new Set(items.map((item) => item.otherParticipantId).filter((id): id is string => id !== null)),
+    ];
+    const propertyIds = [
+      ...new Set(
+        items.map((item) => item.conversation.propertyId).filter((id): id is string => id !== null),
+      ),
+    ];
 
-        return {
-          id: item.conversation.id,
-          propertyId: item.conversation.propertyId,
-          propertyTitle: property?.title ?? null,
-          otherParticipant: other ? { id: other.id, name: other.name } : null,
-          lastMessagePreview: item.conversation.lastMessagePreview,
-          lastMessageAt: item.conversation.lastMessageAt?.toISOString() ?? null,
-          unreadCount: item.unreadCount,
-        };
-      }),
-    );
+    const [otherUsers, properties] = await Promise.all([
+      this.userRepo.findManyByIds(otherParticipantIds),
+      this.propertyRepo.findManyByIds(propertyIds),
+    ]);
+
+    const userById = new Map(otherUsers.map((u) => [u.id, u]));
+    const propertyById = new Map(properties.map((p) => [p.id, p]));
+
+    const summaries: ConversationSummary[] = items.map((item) => {
+      const other = item.otherParticipantId ? (userById.get(item.otherParticipantId) ?? null) : null;
+      const property = item.conversation.propertyId
+        ? (propertyById.get(item.conversation.propertyId) ?? null)
+        : null;
+
+      return {
+        id: item.conversation.id,
+        propertyId: item.conversation.propertyId,
+        propertyTitle: property?.title ?? null,
+        otherParticipant: other ? { id: other.id, name: other.name } : null,
+        lastMessagePreview: item.conversation.lastMessagePreview,
+        lastMessageAt: item.conversation.lastMessageAt?.toISOString() ?? null,
+        unreadCount: item.unreadCount,
+      };
+    });
 
     return { items: summaries, total, page: input.page, pageSize: input.pageSize };
   }

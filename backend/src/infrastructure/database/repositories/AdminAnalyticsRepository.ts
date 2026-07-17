@@ -26,17 +26,21 @@ function toPropertyAnalyticsRow(row: PropertyAnalyticsRowDb): PropertyAnalyticsR
 }
 
 /** Per-metric SQL fragment producing `(ts_column, source_table, extra_where)`
- * used to build the zero-filled daily growth series below. */
-const GROWTH_SOURCES: Record<GrowthMetric, { table: string; column: string; where: string }> = {
-  users: { table: "users", column: "created_at", where: "" },
-  properties: { table: "properties", column: "created_at", where: "WHERE deleted_at IS NULL" },
-  views: { table: "property_views", column: "viewed_at", where: "" },
-  favorites: { table: "property_favorites", column: "created_at", where: "" },
+ * used to build the zero-filled daily growth series below. `extraWhere` is
+ * an additional condition (no leading "WHERE"/"AND") ANDed onto the
+ * mandatory date-range bound applied in getGrowth() -- every source is
+ * always bounded to the requested window, on top of whatever else it
+ * already filtered on. */
+const GROWTH_SOURCES: Record<GrowthMetric, { table: string; column: string; extraWhere: string | null }> = {
+  users: { table: "users", column: "created_at", extraWhere: null },
+  properties: { table: "properties", column: "created_at", extraWhere: "deleted_at IS NULL" },
+  views: { table: "property_views", column: "viewed_at", extraWhere: null },
+  favorites: { table: "property_favorites", column: "created_at", extraWhere: null },
   reports: {
     table:
       "(SELECT created_at FROM property_reports UNION ALL SELECT created_at FROM user_reports) AS combined_reports",
     column: "created_at",
-    where: "",
+    extraWhere: null,
   },
 };
 
@@ -105,6 +109,23 @@ export class AdminAnalyticsRepository implements IAdminAnalyticsRepository {
 
   async getGrowth(metric: GrowthMetric, days: number): Promise<GrowthPoint[]> {
     const source = GROWTH_SOURCES[metric];
+    // Perf fix: the inner aggregate used to have no date bound at all, so it
+    // grouped every row this append-only table has ever had on every call,
+    // then threw away everything outside the requested window only after
+    // the full scan finished. Bounding the inner query to the exact same
+    // window the outer generate_series produces means it only ever touches
+    // rows that can possibly show up in the response.
+    // Regression fix (RC1 QA): the lower bound is now cast `::date` to
+    // floor it to that day's midnight, matching generate_series's own
+    // lower bound below (also `::date`). Before this cast, the filter used
+    // an exact "N days ago, same time-of-day" timestamp while
+    // generate_series started at that day's midnight -- any row created
+    // between midnight and "now's time-of-day" on the oldest requested day
+    // was excluded by this WHERE clause even though generate_series still
+    // produced a bucket expecting a full day's count, silently
+    // undercounting the first data point of every growth chart.
+    const dateFilter = `${source.column} >= (now() - ($1::int - 1) * interval '1 day')::date AND ${source.column} <= now()`;
+    const where = source.extraWhere ? `WHERE ${dateFilter} AND ${source.extraWhere}` : `WHERE ${dateFilter}`;
     const result = await this.pool.query<{ day: string; count: string }>(
       `SELECT gs::date::text AS day, COALESCE(counted.count, 0) AS count
        FROM generate_series(
@@ -115,7 +136,7 @@ export class AdminAnalyticsRepository implements IAdminAnalyticsRepository {
        LEFT JOIN (
          SELECT date_trunc('day', ${source.column})::date AS day, COUNT(*) AS count
          FROM ${source.table}
-         ${source.where}
+         ${where}
          GROUP BY 1
        ) AS counted ON counted.day = gs::date
        ORDER BY gs`,

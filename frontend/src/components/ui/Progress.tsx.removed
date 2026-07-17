@@ -1,0 +1,32 @@
+import { motion } from "framer-motion";
+
+interface ProgressProps {
+  value: number;
+  max?: number;
+  label?: string;
+}
+
+/** Generic progress bar -- used for Profile's verification/completion
+ * indicator. Distinct from the List Property wizard's own progress strip,
+ * which needs per-step dots/labels this doesn't. */
+export function Progress({ value, max = 100, label }: ProgressProps) {
+  const pct = Math.max(0, Math.min(100, (value / max) * 100));
+  return (
+    <div>
+      {label ? (
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem", marginBottom: 6, color: "var(--color-text-muted)" }}>
+          <span>{label}</span>
+          <span>{Math.round(pct)}%</span>
+        </div>
+      ) : null}
+      <div className="progress-v2" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <motion.div
+          className="progress-v2__fill"
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        />
+      </div>
+    </div>
+  );
+}

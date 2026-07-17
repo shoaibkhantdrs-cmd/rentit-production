@@ -31,6 +31,13 @@ export interface UserSearchResult {
 
 export interface IUserRepository {
   findById(id: string): Promise<User | null>;
+  /**
+   * Batch lookup by ID -- additive, every existing call site is unaffected.
+   * Added to let list-shaped use cases (property detail batching, chat
+   * conversation listing) fetch N users in one query instead of looping
+   * findById per row.
+   */
+  findManyByIds(ids: string[]): Promise<User[]>;
   findByEmail(email: string): Promise<User | null>;
   findByPhone(phone: string): Promise<User | null>;
   create(data: NewUser): Promise<User>;

@@ -4,6 +4,7 @@ import { asyncHandler } from "@/interfaces/http/asyncHandler";
 import { validate } from "@/interfaces/http/middleware/validate";
 import { authorize } from "@/interfaces/http/middleware/authorize";
 import { uploadPropertyImages } from "@/interfaces/http/middleware/imageUpload";
+import { cacheControl } from "@/interfaces/http/middleware/cacheControl";
 import {
   createPropertySchema,
   updatePropertySchema,
@@ -41,7 +42,9 @@ export function createPropertyRouter(
   // migration) to populate the Add/Edit Property forms and the Search
   // page's Category filter. Registered before "/:id" for the same
   // route-ordering reason as "/mine" and "/favorites" above.
-  router.get("/categories", asyncHandler(controller.categories));
+  // Phase 6 Part 3 (performance): this list is effectively static --
+  // safe to let a CDN/browser cache it for a few minutes.
+  router.get("/categories", cacheControl(300), asyncHandler(controller.categories));
 
   // Phase 5 Parts 6-7 (Recently Viewed / Recommendations) -- same
   // route-ordering reason as /mine, /favorites, /categories above.

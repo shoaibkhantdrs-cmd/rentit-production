@@ -199,9 +199,23 @@ export interface CreatePropertyPayload {
   location: PropertyFormLocationInput;
 }
 
-export type UpdatePropertyPayload = Partial<Omit<CreatePropertyPayload, "location">> & {
-  status?: PropertyStatus;
+// Bug fix (QA report #14 + #15): this used to type `status` as the full
+// PropertyStatus union (including "rejected", which the backend's
+// updatePropertySchema does not accept on update -- see
+// backend/.../validators/property.schemas.ts's statusEnum), and typed
+// floorNumber/totalFloors/facing as non-nullable, so there was no way
+// through this client to send the `null` the backend explicitly accepts
+// for those three fields to clear a previously-set value on edit.
+export type UpdatablePropertyStatus = Exclude<PropertyStatus, "rejected">;
+
+export type UpdatePropertyPayload = Partial<
+  Omit<CreatePropertyPayload, "location" | "floorNumber" | "totalFloors" | "facing">
+> & {
+  status?: UpdatablePropertyStatus;
   location?: Partial<PropertyFormLocationInput>;
+  floorNumber?: number | null;
+  totalFloors?: number | null;
+  facing?: Facing | null;
 };
 
 export interface PublicUser {
@@ -538,4 +552,60 @@ export interface SavedSearch {
   lastNotifiedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// --- Phase 6 Part 1: Payments -------------------------------------------
+
+export type PaymentGatewayName = "razorpay" | "stripe";
+export type BoostType = "featured" | "boost";
+
+export interface PaymentPublicConfig {
+  razorpayKeyId: string;
+  stripePublishableKey: string;
+}
+
+export interface PremiumPlan {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  priceAmount: number;
+  currency: string;
+  durationDays: number;
+  features: string[];
+  isActive: boolean;
+}
+
+export interface CreateOrderResult {
+  paymentOrderId: string;
+  gateway: PaymentGatewayName;
+  gatewayOrderId: string;
+  amount: number;
+  currency: string;
+  /** Stripe: { clientSecret }. Razorpay needs nothing extra beyond the order id + public key. */
+  providerData?: Record<string, unknown>;
+}
+
+export type PaymentStatus = "succeeded" | "failed" | "refunded" | "partially_refunded";
+
+export interface PaymentRecord {
+  id: string;
+  paymentOrderId: string;
+  gateway: PaymentGatewayName;
+  gatewayPaymentId: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  method: string | null;
+  createdAt: string;
+}
+
+export interface InvoiceRecord {
+  id: string;
+  paymentId: string;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  lineDescription: string;
+  issuedAt: string;
 }

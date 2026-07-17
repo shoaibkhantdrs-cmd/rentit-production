@@ -7,6 +7,8 @@ import { VerificationController } from "@/interfaces/http/controllers/Verificati
 import { ChatController } from "@/interfaces/http/controllers/ChatController";
 import { WhatsAppController } from "@/interfaces/http/controllers/WhatsAppController";
 import { SavedSearchController } from "@/interfaces/http/controllers/SavedSearchController";
+import { PaymentController } from "@/interfaces/http/controllers/PaymentController";
+import { WebhookController } from "@/interfaces/http/controllers/WebhookController";
 import { createAuthRouter } from "@/interfaces/http/routes/auth.routes";
 import { createUserRouter } from "@/interfaces/http/routes/user.routes";
 import { createNotificationRouter } from "@/interfaces/http/routes/notification.routes";
@@ -15,6 +17,8 @@ import { createVerificationRouter } from "@/interfaces/http/routes/verification.
 import { createChatRouter } from "@/interfaces/http/routes/chat.routes";
 import { createWhatsAppRouter } from "@/interfaces/http/routes/whatsapp.routes";
 import { createSavedSearchRouter } from "@/interfaces/http/routes/savedsearch.routes";
+import { createPaymentRouter } from "@/interfaces/http/routes/payment.routes";
+import { createWebhookRouter } from "@/interfaces/http/routes/webhook.routes";
 import { createAdminRouter, AdminRouterDeps } from "@/interfaces/http/routes/admin.routes";
 import { healthRouter } from "@/routes/health.routes";
 
@@ -27,9 +31,14 @@ export interface ApiRouterDeps extends AdminRouterDeps {
   chatController: ChatController;
   whatsAppController: WhatsAppController;
   savedSearchController: SavedSearchController;
+  paymentController: PaymentController;
+  webhookController: WebhookController;
   authenticate: RequestHandler;
   optionalAuthenticate: RequestHandler;
   authRateLimiter: RequestHandler;
+  messagingRateLimiter: RequestHandler;
+  webhookRateLimiter: RequestHandler;
+  paymentOrderRateLimiter: RequestHandler;
 }
 
 export function createApiRouter(deps: ApiRouterDeps): Router {
@@ -50,9 +59,24 @@ export function createApiRouter(deps: ApiRouterDeps): Router {
     "/verification",
     createVerificationRouter(deps.verificationController, deps.authenticate),
   );
-  router.use("/chat", createChatRouter(deps.chatController, deps.authenticate));
-  router.use("/whatsapp", createWhatsAppRouter(deps.whatsAppController, deps.authenticate));
+  router.use(
+    "/chat",
+    createChatRouter(deps.chatController, deps.authenticate, deps.messagingRateLimiter),
+  );
+  router.use(
+    "/whatsapp",
+    createWhatsAppRouter(deps.whatsAppController, deps.authenticate, deps.messagingRateLimiter),
+  );
   router.use("/saved-searches", createSavedSearchRouter(deps.savedSearchController, deps.authenticate));
+  router.use(
+    "/payments",
+    createPaymentRouter(deps.paymentController, deps.authenticate, deps.paymentOrderRateLimiter),
+  );
+  // Signature verification for these two routes needs the exact original
+  // request bytes, not the re-serialized parsed JSON -- see app.ts's
+  // express.json({ verify }) hook that captures req.rawBody, and
+  // webhook.routes.ts's doc comment for the full reasoning.
+  router.use("/webhooks", createWebhookRouter(deps.webhookController, deps.webhookRateLimiter));
   router.use("/admin", createAdminRouter(deps, deps.authenticate));
 
   return router;

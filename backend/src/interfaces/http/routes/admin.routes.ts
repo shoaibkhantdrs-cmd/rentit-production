@@ -6,6 +6,7 @@ import { AdminVerificationController } from "@/interfaces/http/controllers/Admin
 import { AdminNotificationController } from "@/interfaces/http/controllers/AdminNotificationController";
 import { AdminDashboardController } from "@/interfaces/http/controllers/AdminDashboardController";
 import { AdminAuditController } from "@/interfaces/http/controllers/AdminAuditController";
+import { AdminPaymentController } from "@/interfaces/http/controllers/AdminPaymentController";
 import { asyncHandler } from "@/interfaces/http/asyncHandler";
 import { validate } from "@/interfaces/http/middleware/validate";
 import { authorize } from "@/interfaces/http/middleware/authorize";
@@ -30,6 +31,11 @@ import {
   updateUserStatusSchema,
   paginationQuerySchema,
 } from "@/interfaces/http/validators/admin.schemas";
+import {
+  paymentHistoryQuerySchema,
+  paymentIdParamSchema,
+  adminRefundPaymentSchema,
+} from "@/interfaces/http/validators/payment.schemas";
 
 export interface AdminRouterDeps {
   adminUserController: AdminUserController;
@@ -39,6 +45,7 @@ export interface AdminRouterDeps {
   adminNotificationController: AdminNotificationController;
   adminDashboardController: AdminDashboardController;
   adminAuditController: AdminAuditController;
+  adminPaymentController: AdminPaymentController;
 }
 
 /**
@@ -219,6 +226,24 @@ export function createAdminRouter(deps: AdminRouterDeps, authenticate: RequestHa
     "/audit-logs",
     validate(searchAuditLogsQuerySchema, "query"),
     asyncHandler(deps.adminAuditController.search),
+  );
+
+  // --- Phase 6 Part 1: Payments ---
+  router.get(
+    "/payments",
+    validate(paymentHistoryQuerySchema, "query"),
+    asyncHandler(deps.adminPaymentController.list),
+  );
+  router.get(
+    "/payments/:id/refunds",
+    validate(paymentIdParamSchema, "params"),
+    asyncHandler(deps.adminPaymentController.refunds),
+  );
+  router.post(
+    "/payments/:id/refund",
+    validate(paymentIdParamSchema, "params"),
+    validate(adminRefundPaymentSchema),
+    asyncHandler(deps.adminPaymentController.refund),
   );
 
   return router;

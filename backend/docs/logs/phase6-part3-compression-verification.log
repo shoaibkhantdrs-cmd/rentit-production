@@ -1,0 +1,5 @@
+original size: 8479
+brotli size: 662 ratio: 0.08
+brotli round-trip matches: true
+gzip size: 1457 ratio: 0.17
+gzip round-trip matches: true

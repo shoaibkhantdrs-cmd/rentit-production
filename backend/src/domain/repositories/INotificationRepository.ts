@@ -23,6 +23,13 @@ export interface ListNotificationsResult {
 
 export interface INotificationRepository {
   create(input: NewNotificationInput): Promise<Notification>;
+  /**
+   * Bulk equivalent of calling create() once per input, in a single round
+   * trip. Added for BroadcastNotification, which used to insert up to 5,000
+   * rows sequentially (one awaited INSERT at a time) on a single admin
+   * request.
+   */
+  createMany(inputs: NewNotificationInput[]): Promise<Notification[]>;
   listForUser(userId: string, options: ListNotificationsOptions): Promise<ListNotificationsResult>;
   markRead(userId: string, ids: string[]): Promise<number>;
   markAllRead(userId: string): Promise<number>;

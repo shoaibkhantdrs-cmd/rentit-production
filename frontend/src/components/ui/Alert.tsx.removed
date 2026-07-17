@@ -1,0 +1,25 @@
+import { ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
+
+type AlertVariant = "success" | "error" | "warning" | "info";
+
+const ICONS: Record<AlertVariant, typeof Info> = {
+  success: CheckCircle2,
+  error: XCircle,
+  warning: AlertTriangle,
+  info: Info,
+};
+
+/** Typed wrapper around the existing `.alert` class family (adds an icon
+ * and a `warning` variant that didn't exist before). Existing raw
+ * `.alert.alert--error` etc. usages elsewhere keep working unchanged --
+ * this is the preferred way to write new inline alerts going forward. */
+export function Alert({ variant = "info", children }: { variant?: AlertVariant; children: ReactNode }) {
+  const Icon = ICONS[variant];
+  return (
+    <div className={`alert alert--${variant}`} role={variant === "error" ? "alert" : "status"}>
+      <Icon size={16} style={{ flexShrink: 0 }} />
+      <span>{children}</span>
+    </div>
+  );
+}

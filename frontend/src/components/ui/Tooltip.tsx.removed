@@ -1,0 +1,40 @@
+import { ReactNode, useId, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+
+/**
+ * Minimal hover/focus tooltip for icon-only buttons (favorite, compare,
+ * share, call, WhatsApp) so their purpose is discoverable without relying
+ * solely on a native `title` attribute, which is slow to appear and
+ * inconsistent across browsers/mobile (no hover at all on touch).
+ */
+export function Tooltip({ label, children }: { label: string; children: ReactNode }) {
+  const [visible, setVisible] = useState(false);
+  const id = useId();
+
+  return (
+    <span
+      className="tooltip-wrapper"
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+      onFocus={() => setVisible(true)}
+      onBlur={() => setVisible(false)}
+    >
+      {children}
+      <AnimatePresence>
+        {visible ? (
+          <motion.span
+            role="tooltip"
+            id={id}
+            className="tooltip-bubble"
+            initial={{ opacity: 0, y: 4, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.95 }}
+            transition={{ duration: 0.12 }}
+          >
+            {label}
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
+    </span>
+  );
+}

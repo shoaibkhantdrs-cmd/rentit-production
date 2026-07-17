@@ -56,12 +56,24 @@ export const adminApi = {
   deleteUser: (userId: string) => httpClient.delete<void>(`/admin/users/${userId}`),
   resetUserPassword: (userId: string) =>
     httpClient.post<{ message: string }>(`/admin/users/${userId}/reset-password`),
+  // RC1 bug fix: this was a PATCH, but the backend only accepts PUT for
+  // this route (admin.routes.ts: router.put("/users/:id/roles", ...)) --
+  // every call to this method was failing (404/405) before this fix.
   updateUserRoles: (userId: string, roleNames: string[]) =>
-    httpClient.patch<AdminUserSummary>(`/admin/users/${userId}/roles`, { roleNames }),
+    httpClient.put<AdminUserSummary>(`/admin/users/${userId}/roles`, { roleNames }),
 
   // --- Part 3: Property Moderation ---
   searchProperties: (filters: AdminPropertySearchFilters) =>
-    httpClient.get<PaginatedResult<AdminProperty>>("/admin/properties", filters),
+    // Spread into a fresh object literal (not just `filters` as-is) --
+    // passing a named-interface-typed variable directly to a
+    // Record<string, ...>-typed parameter fails TypeScript's structural
+    // index-signature check even though every property here already has
+    // a compatible value type; a fresh object literal doesn't have that
+    // restriction. Found via a real `tsc --noEmit` run (Part 9 QA), fixed
+    // here rather than by loosening AdminPropertySearchFilters itself
+    // (which is also used for component state typing elsewhere) or
+    // httpClient's query type (used by every other API call).
+    httpClient.get<PaginatedResult<AdminProperty>>("/admin/properties", { ...filters }),
   approveProperty: (propertyId: string) => httpClient.post<AdminProperty>(`/admin/properties/${propertyId}/approve`),
   rejectProperty: (propertyId: string, reason: string) =>
     httpClient.post<AdminProperty>(`/admin/properties/${propertyId}/reject`, { reason }),

@@ -11,7 +11,11 @@ import {
   chatPaginationQuerySchema,
 } from "@/interfaces/http/validators/chat.schemas";
 
-export function createChatRouter(controller: ChatController, authenticate: RequestHandler): Router {
+export function createChatRouter(
+  controller: ChatController,
+  authenticate: RequestHandler,
+  messagingRateLimiter: RequestHandler,
+): Router {
   const router = Router();
   router.use(authenticate);
 
@@ -32,6 +36,10 @@ export function createChatRouter(controller: ChatController, authenticate: Reque
   );
   router.post(
     "/conversations/:id/messages",
+    // Audit fix: sending messages had no rate limit -- capped now so a
+    // compromised/malicious account can't flood a conversation or the
+    // downstream push/email notification pipeline.
+    messagingRateLimiter,
     validate(conversationIdParamSchema, "params"),
     uploadSingleImage("image"),
     validate(sendMessageSchema),

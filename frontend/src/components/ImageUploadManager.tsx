@@ -84,13 +84,13 @@ export function ImageUploadManager({
             .map((img) => (
               <div key={img.id} className="card">
                 <div className="property-card__image">
-                  <img src={img.url} alt="" />
+                  <img src={img.url} alt="" loading="lazy" decoding="async" />
                 </div>
                 <div className="property-card__body" style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  {img.isPrimary ? <span className="badge badge--published">Primary</span> : <span />}
+                  {img.isPrimary ? <span className="pill-badge pill-badge--status">Primary</span> : <span />}
                   <button
                     type="button"
-                    className="btn btn--danger btn--sm"
+                    className="btn-v2 btn-v2--danger btn-v2--sm"
                     onClick={() => handleDelete(img.id)}
                     disabled={deletingId === img.id}
                   >

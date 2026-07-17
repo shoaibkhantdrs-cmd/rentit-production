@@ -20,7 +20,7 @@ export class GetMyPropertiesUseCase {
       input.pageSize,
     );
 
-    const details = await Promise.all(items.map((p) => this.detailLoader.load(p, input.ownerId)));
+    const details = await this.detailLoader.loadMany(items, input.ownerId);
 
     return { items: details, total, page: input.page, pageSize: input.pageSize };
   }

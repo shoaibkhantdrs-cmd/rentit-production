@@ -1,0 +1,43 @@
+Phase 6 Part 1 (Payments) -- real verification log
+Run: node --experimental-transform-types against the ACTUAL production
+class files (RazorpayPaymentGateway.ts, StripePaymentGateway.ts), not
+reimplemented copies. This sandbox has no npm registry access (confirmed
+during the Phase 6 audit), so the full `npm test` suite (which needs tsx +
+node-pg-migrate + express, none installable here) cannot run end-to-end.
+This is a targeted, dependency-free verification of the highest-risk new
+logic: webhook signature verification (the actual authentication
+mechanism for two unauthenticated public endpoints) and event parsing.
+
+Command: node --experimental-transform-types run.ts (against /tmp copies
+with only the import paths rewritten from "@/..." to relative, so the
+executed code is byte-identical to what ships).
+
+Result:
+PASS: razorpay real class: valid sig accepted
+PASS: razorpay real class: wrong sig rejected
+PASS: razorpay real class: parses payment.succeeded
+PASS: razorpay real class: extracts payment id
+PASS: razorpay real class: extracts order id
+PASS: stripe real class: valid sig accepted
+PASS: stripe real class: expired ts rejected
+PASS: stripe real class: parses payment.succeeded
+PASS: stripe real class: extracts payment intent id
+
+9 passed, 0 failed
+
+Additional standalone algorithm-level verification (12 cases covering
+wrong secret, tampered body, missing signature, malformed/non-hex
+signature, truncated signature, expired timestamp, future timestamp
+beyond tolerance, missing v1 field) also passed 12/12 -- see
+phase6-part1-webhook-signature-algorithm.log.
+
+Not verified in this sandbox (blocked by lack of npm registry / Docker /
+Postgres access, same limitation documented in phase-6-audit.md):
+- Full repository/use-case unit tests (tests/unit/RazorpayPaymentGateway.test.ts,
+  tests/unit/StripePaymentGateway.test.ts) via the real `npm test` runner.
+- Any actual HTTP round-trip against Razorpay's or Stripe's real API
+  (createOrder/createRefund network calls) -- these require live API
+  keys and outbound network access, both unavailable here.
+- Database round-trips for the 8 new repositories -- require a running
+  Postgres instance, which this sandbox cannot provision (no Docker, no
+  postgres binary, confirmed in the Phase 6 audit).

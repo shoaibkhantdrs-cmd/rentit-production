@@ -2,6 +2,7 @@ import { RequestHandler, Router } from "express";
 import { AuthController } from "@/interfaces/http/controllers/AuthController";
 import { asyncHandler } from "@/interfaces/http/asyncHandler";
 import { validate } from "@/interfaces/http/middleware/validate";
+import { env } from "@/config/env";
 import {
   registerSchema,
   loginSchema,
@@ -54,6 +55,16 @@ export function createAuthRouter(
     validate(resetPasswordSchema),
     asyncHandler(controller.resetPasswordHandler),
   );
+
+  // Dev-only, no-OTP, no-email auto-login. This route is only registered
+  // at all when NODE_ENV=development -- in every other environment
+  // (including production and test) it simply does not exist, so it falls
+  // through to the normal 404 handler rather than being reachable and
+  // relying solely on a runtime check. See container.ts / AuthController
+  // for the other two independent layers of the same guard.
+  if (env.nodeEnv === "development") {
+    router.post("/dev-login", asyncHandler(controller.devLogin));
+  }
 
   return router;
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { adminApi } from "@/api/admin";
 import { useAsync } from "@/hooks/useAsync";
@@ -11,10 +11,23 @@ import { UserStatus } from "@/api/types";
 const PAGE_SIZE = 20;
 
 export function UsersPage() {
+  // Perf fix: `query` used to be both the input's bound value AND a
+  // useAsync dependency, so every keystroke fired a full search request
+  // and swapped the table for a skeleton mid-typing. `queryInput` is now
+  // the instantly-responsive input value; `query` (what useAsync actually
+  // depends on) only catches up after a typing pause -- same
+  // debounce-with-cleanup shape as SearchPage's city/locality fix and
+  // HomePage's hero search suggestions.
+  const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<UserStatus | "">("");
   const [role, setRole] = useState("");
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(queryInput), 400);
+    return () => window.clearTimeout(timer);
+  }, [queryInput]);
 
   const { status: reqStatus, data, error, reload } = useAsync(
     () =>
@@ -41,10 +54,10 @@ export function UsersPage() {
         <input
           type="search"
           placeholder="Search by name, email, or phone"
-          value={query}
+          value={queryInput}
           onChange={(e) => {
             setPage(1);
-            setQuery(e.target.value);
+            setQueryInput(e.target.value);
           }}
         />
         <select

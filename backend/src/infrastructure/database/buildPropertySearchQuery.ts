@@ -2,10 +2,10 @@ import { PropertySearchOptions } from "@/domain/repositories/IPropertyRepository
 import { boundingBox } from "@/application/properties/shared/haversine";
 
 const SORT_CLAUSES: Record<PropertySearchOptions["sort"], string> = {
-  newest: "p.created_at DESC",
-  most_viewed: "p.view_count DESC",
-  price_low_to_high: "p.rent_amount ASC",
-  price_high_to_low: "p.rent_amount DESC",
+  newest: "created_at DESC",
+  most_viewed: "view_count DESC",
+  price_low_to_high: "rent_amount ASC",
+  price_high_to_low: "rent_amount DESC",
 };
 
 export interface BuiltQuery {

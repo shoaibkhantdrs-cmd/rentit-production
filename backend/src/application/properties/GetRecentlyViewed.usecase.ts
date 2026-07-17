@@ -27,7 +27,7 @@ export class GetRecentlyViewedUseCase {
       .map((id) => byId.get(id))
       .filter((property): property is NonNullable<typeof property> => property !== undefined && property.status === "published");
 
-    const items = await Promise.all(ordered.map((property) => this.detailLoader.load(property, userId)));
+    const items = await this.detailLoader.loadMany(ordered, userId);
     return { items };
   }
 }

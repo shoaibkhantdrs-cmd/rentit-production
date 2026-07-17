@@ -1,7 +1,10 @@
 import { NextFunction, Request, Response } from "express";
 
 // Matches C0 control characters and DEL, expressed via escapes (not raw
-// bytes) so the source file itself stays plain ASCII text.
+// bytes) so the source file itself stays plain ASCII text. The whole point
+// of this regex is to match control characters, so it deliberately
+// disables eslint's no-control-regex rule rather than working around it.
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\x00-\x1F\x7F]/g;
 
 function sanitizeValue(value: unknown): unknown {

@@ -29,7 +29,7 @@ export class GetMyFavoritesUseCase {
     // to return.
     const ordered = ids.map((id) => byId.get(id)).filter((p): p is NonNullable<typeof p> => Boolean(p));
 
-    const details = await Promise.all(ordered.map((p) => this.detailLoader.load(p, input.userId)));
+    const details = await this.detailLoader.loadMany(ordered, input.userId);
 
     return { items: details, total, page: input.page, pageSize: input.pageSize };
   }

@@ -1,11 +1,11 @@
 export function PropertyCardSkeleton() {
   return (
-    <div className="card property-card" aria-hidden="true">
-      <div className="skeleton property-card__image" />
-      <div className="property-card__body">
-        <div className="skeleton skeleton--title" />
-        <div className="skeleton skeleton--text" style={{ width: "80%" }} />
-        <div className="skeleton skeleton--text" style={{ width: "50%" }} />
+    <div className="property-card-v2" aria-hidden="true">
+      <div className="skeleton property-card-v2__media" style={{ borderRadius: 0 }} />
+      <div className="property-card-v2__body">
+        <div className="skeleton skeleton--title" style={{ width: "45%" }} />
+        <div className="skeleton skeleton--text" style={{ width: "85%" }} />
+        <div className="skeleton skeleton--text" style={{ width: "60%" }} />
       </div>
     </div>
   );
@@ -13,7 +13,7 @@ export function PropertyCardSkeleton() {
 
 export function PropertyGridSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <div className="property-grid">
+    <div className="property-grid-v2">
       {Array.from({ length: count }).map((_, i) => (
         <PropertyCardSkeleton key={i} />
       ))}

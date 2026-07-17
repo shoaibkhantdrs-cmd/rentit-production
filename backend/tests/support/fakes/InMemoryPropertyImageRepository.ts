@@ -39,6 +39,13 @@ export class InMemoryPropertyImageRepository implements IPropertyImageRepository
       .sort((a, b) => a.sortOrder - b.sortOrder);
   }
 
+  async listForProperties(propertyIds: string[]): Promise<PropertyImage[]> {
+    const idSet = new Set(propertyIds);
+    return Array.from(this.images.values())
+      .filter((img) => idSet.has(img.propertyId) && !img.deletedAt)
+      .sort((a, b) => a.propertyId.localeCompare(b.propertyId) || a.sortOrder - b.sortOrder);
+  }
+
   async listPrimaryForProperties(propertyIds: string[]): Promise<PropertyImage[]> {
     const idSet = new Set(propertyIds);
     const byProperty = new Map<string, PropertyImage>();

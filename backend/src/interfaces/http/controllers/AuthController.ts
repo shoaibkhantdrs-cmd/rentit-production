@@ -8,7 +8,8 @@ import { LogoutUserUseCase } from "@/application/auth/LogoutUser.usecase";
 import { LogoutAllDevicesUseCase } from "@/application/auth/LogoutAllDevices.usecase";
 import { ForgotPasswordUseCase } from "@/application/auth/ForgotPassword.usecase";
 import { ResetPasswordUseCase } from "@/application/auth/ResetPassword.usecase";
-import { UnauthorizedError } from "@/domain/errors/AppError";
+import { DevAutoLoginUseCase } from "@/application/auth/DevAutoLogin.usecase";
+import { NotFoundError, UnauthorizedError } from "@/domain/errors/AppError";
 import {
   registerSchema,
   loginSchema,
@@ -29,6 +30,8 @@ export class AuthController {
     private readonly logoutAllDevices: LogoutAllDevicesUseCase,
     private readonly forgotPassword: ForgotPasswordUseCase,
     private readonly resetPassword: ResetPasswordUseCase,
+    /** Only non-null when NODE_ENV=development -- see container.ts. */
+    private readonly devAutoLogin: DevAutoLoginUseCase | null,
   ) {}
 
   register = async (req: Request, res: Response): Promise<void> => {
@@ -83,5 +86,18 @@ export class AuthController {
     const body = req.body as z.infer<typeof resetPasswordSchema>;
     await this.resetPassword.execute(body);
     res.status(200).json({ message: "Password reset successfully. Please log in again." });
+  };
+
+  /**
+   * Dev-only: mints a real session for the local demo account, no OTP, no
+   * email. `this.devAutoLogin` is only ever non-null when
+   * NODE_ENV=development (see container.ts) -- the `!devAutoLogin` branch
+   * below is defense-in-depth for a route that, in normal operation, isn't
+   * even registered outside development (see auth.routes.ts).
+   */
+  devLogin = async (req: Request, res: Response): Promise<void> => {
+    if (!this.devAutoLogin) throw new NotFoundError();
+    const result = await this.devAutoLogin.execute({ device: req.deviceContext });
+    res.status(200).json(result);
   };
 }

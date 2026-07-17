@@ -56,14 +56,17 @@ export class BroadcastNotificationUseCase {
 
     const capped = recipientIds.slice(0, MAX_RECIPIENTS);
 
-    for (const userId of capped) {
-      await this.notificationRepo.create({
+    // Perf fix: was one awaited INSERT per recipient (up to 5,000
+    // sequential round trips on a single admin request); now a single bulk
+    // insert. Same rows created, same notification content per recipient.
+    await this.notificationRepo.createMany(
+      capped.map((userId) => ({
         userId,
         type: "admin.broadcast",
         title: input.title.trim(),
         body: input.body.trim(),
-      });
-    }
+      })),
+    );
 
     await this.pushService.sendBulk(
       capped.map((userId) => ({ userId, title: input.title.trim(), body: input.body.trim() })),

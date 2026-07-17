@@ -7,9 +7,9 @@ import { PropertyForm, PropertyFormValues } from "@/components/PropertyForm";
 import { ImageUploadManager } from "@/components/ImageUploadManager";
 import { PropertyDetailSkeleton } from "@/components/Skeletons";
 import { ErrorState } from "@/components/ErrorState";
-import { PropertyStatus } from "@/api/types";
+import { PropertyStatus, UpdatablePropertyStatus } from "@/api/types";
 
-const STATUS_OPTIONS: PropertyStatus[] = [
+const STATUS_OPTIONS: UpdatablePropertyStatus[] = [
   "draft",
   "pending_review",
   "published",
@@ -39,7 +39,7 @@ function EditPropertyForm({ propertyId }: { propertyId: string }) {
     navigate(`/properties/${propertyId}`);
   };
 
-  const handleStatusChange = async (next: PropertyStatus) => {
+  const handleStatusChange = async (next: UpdatablePropertyStatus) => {
     setStatusSaving(true);
     setStatusError(null);
     try {
@@ -70,7 +70,7 @@ function EditPropertyForm({ propertyId }: { propertyId: string }) {
             id="status-select"
             value={currentStatus}
             disabled={statusSaving}
-            onChange={(e) => handleStatusChange(e.target.value as PropertyStatus)}
+            onChange={(e) => handleStatusChange(e.target.value as UpdatablePropertyStatus)}
           >
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>

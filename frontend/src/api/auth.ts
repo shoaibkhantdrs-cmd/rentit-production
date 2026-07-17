@@ -36,6 +36,17 @@ export const authApi = {
   logout: (refreshToken: string) => httpClient.post<void>("/auth/logout", { refreshToken }, false),
 
   logoutAll: () => httpClient.post<{ revokedSessions: number }>("/auth/logout-all", undefined, true),
+
+  /**
+   * Dev-only, no-OTP, no-email auto-login. The backend route this calls
+   * (`POST /auth/dev-login`) is only registered at all when the backend is
+   * running with NODE_ENV=development -- in a production build/server it
+   * 404s. AuthContext only ever calls this when `import.meta.env.DEV` is
+   * true, i.e. never in a production frontend build either. Two
+   * independent guards, so there's no single flag that could leak this
+   * into production.
+   */
+  devLogin: () => httpClient.post<RegisterResult>("/auth/dev-login", undefined, false),
 };
 
 export type { AuthTokens };

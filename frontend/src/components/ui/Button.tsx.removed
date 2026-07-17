@@ -1,0 +1,33 @@
+import { ButtonHTMLAttributes, ReactNode } from "react";
+
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "primary" | "secondary" | "ghost" | "danger";
+  size?: "md" | "sm";
+  icon?: ReactNode;
+  fullWidth?: boolean;
+}
+
+/**
+ * Typed wrapper around the `.btn-v2` class family so new code can write
+ * `<Button variant="primary">` instead of juggling raw class-name strings.
+ * Existing call sites using the raw `btn-v2` classes directly still work
+ * identically -- this doesn't replace them, it's the preferred way to
+ * write new buttons going forward.
+ */
+export function Button({ variant = "primary", size = "md", icon, fullWidth, className, children, ...rest }: ButtonProps) {
+  const classes = [
+    "btn-v2",
+    `btn-v2--${variant}`,
+    size === "sm" ? "btn-v2--sm" : "",
+    className ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <button type="button" className={classes} style={fullWidth ? { width: "100%" } : undefined} {...rest}>
+      {icon}
+      {children}
+    </button>
+  );
+}

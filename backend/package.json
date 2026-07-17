@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "main": "dist/server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
@@ -16,7 +19,10 @@
     "migrate:create": "node-pg-migrate create -m db/migrations -j js --",
     "test": "node --import tsx --test tests/**/*.test.ts",
     "test:unit": "node --import tsx --test tests/unit/**/*.test.ts",
-    "test:integration": "node --import tsx --test tests/integration/**/*.test.ts"
+    "test:integration": "node --import tsx --test tests/integration/**/*.test.ts",
+    "backup:db": "bash scripts/backup-db.sh",
+    "restore:db": "bash scripts/restore-db.sh",
+    "test:smtp": "tsx scripts/test-smtp.ts"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

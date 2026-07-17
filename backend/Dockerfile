@@ -29,4 +29,14 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package*.json ./
 EXPOSE 4000
+# Phase 6 Part 6 (CI/CD): run as the non-root `node` user the base image
+# already ships (not root, the Dockerfile default) -- a compromised
+# process gets far less to work with. Also gives the orchestrator (Docker
+# Swarm/Kubernetes/plain `docker run --health-cmd`) a way to know the
+# container is actually serving traffic, not just that the process is
+# alive -- hits the liveness endpoint added in Part 4, no external tool
+# needed since Node itself can make the request.
+USER node
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "fetch('http://localhost:4000/health/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 CMD ["node", "dist/server.js"]

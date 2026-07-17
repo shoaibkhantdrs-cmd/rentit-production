@@ -79,6 +79,17 @@ export class PropertyImageRepository implements IPropertyImageRepository {
     return result.rows.map(toEntity);
   }
 
+  async listForProperties(propertyIds: string[]): Promise<PropertyImage[]> {
+    if (propertyIds.length === 0) return [];
+    const result = await this.pool.query<PropertyImageRow>(
+      `SELECT * FROM property_images
+       WHERE property_id = ANY($1::uuid[]) AND deleted_at IS NULL
+       ORDER BY property_id, sort_order`,
+      [propertyIds],
+    );
+    return result.rows.map(toEntity);
+  }
+
   async listPrimaryForProperties(propertyIds: string[]): Promise<PropertyImage[]> {
     if (propertyIds.length === 0) return [];
     // One row per property: the primary image if set, otherwise whatever

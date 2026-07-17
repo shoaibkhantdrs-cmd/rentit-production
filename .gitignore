@@ -3,10 +3,18 @@ node_modules/
 **/node_modules/
 
 # Env files
+# Phase 6 Part 6 (CI/CD): broadened this while adding .env.production.example
+# -- the previous rules (.env, .env.local, .env.*.local) did NOT match a
+# real secrets file named .env.production (only .env.production.local
+# would have matched), meaning that exact filename -- the one
+# docker-compose.prod.yml's usage instructions tell an operator to create
+# -- could have been committed by accident. `.env.*` now catches every
+# real env file regardless of suffix; the two explicit `!` rules below
+# keep the example templates tracked.
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+!.env.*.example
 
 # Build output
 dist/
@@ -18,6 +26,13 @@ build/
 *.log
 npm-debug.log*
 logs/
+# Except the Phase 6 verification logs under docs/logs/ -- these are
+# intentional evidence artifacts (real command output proving a fix
+# works), not runtime noise. Found this rule was silently excluding them
+# from git entirely (`git check-ignore` confirmed it) while auditing
+# backup/recovery docs in Part 5.
+!**/docs/logs/
+!**/docs/logs/*.log
 
 # OS
 .DS_Store
@@ -33,3 +48,37 @@ docker-compose.override.yml
 
 # Test / coverage
 coverage/
+
+# TypeScript incremental build cache -- regenerated automatically by
+# `tsc -b`/`tsc --incremental`, machine- and run-specific, not meant to be
+# committed. Found present but untracked-by-gitignore in frontend/ during
+# the Mac consolidation/verification pass (created by real tsc runs
+# during Part 9's typecheck audit).
+*.tsbuildinfo
+
+# Database backups (Phase 6 Part 5) -- these contain real user data and
+# must never be committed; ship them to off-host object storage instead
+# (see backend/docs/phase-6-part5-backup-recovery.md).
+backend/backups/*.dump
+!backend/backups/.gitkeep
+
+# Mobile (Phase 6 Part 7) -- `frontend/android/` and `frontend/ios/` are
+# created by `npx cap add android`/`ios` and, unlike node_modules, ARE
+# meant to be committed (they hold real native project config, not just
+# reinstallable dependencies) -- see docs/phase-6-part7-mobile.md. Only
+# their machine-specific / generated-on-every-build subdirectories are
+# excluded here, plus anything that could sign a release build.
+frontend/android/local.properties
+frontend/android/.gradle/
+frontend/android/**/build/
+frontend/android/app/release/
+frontend/ios/App/Pods/
+frontend/ios/App/build/
+frontend/ios/**/DerivedData/
+frontend/ios/**/*.xcuserdatad/
+frontend/ios/**/xcuserdata/
+# Signing material -- must never be committed regardless of platform.
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
