@@ -1,0 +1,5 @@
+=== Phase 3: syntax check (backend) ===
+CRASH in src/types/express/index.d.ts: Debug Failure. Output generation failed
+
+Checked 334 files, 1 syntax errors.
+EXIT=0

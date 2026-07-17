@@ -13,7 +13,7 @@ export function Pagination({ page, pageSize, total, onPageChange }: PaginationPr
     <nav className="pagination" aria-label="Pagination">
       <button
         type="button"
-        className="btn btn--secondary btn--sm"
+        className="btn-v2 btn-v2--secondary btn-v2--sm"
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
       >
@@ -24,7 +24,7 @@ export function Pagination({ page, pageSize, total, onPageChange }: PaginationPr
       </span>
       <button
         type="button"
-        className="btn btn--secondary btn--sm"
+        className="btn-v2 btn-v2--secondary btn-v2--sm"
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
       >

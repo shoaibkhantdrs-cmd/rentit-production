@@ -4,14 +4,14 @@ import { IPropertyFeatureRepository } from "@/domain/repositories/IPropertyFeatu
 import { IPropertyStatusHistoryRepository } from "@/domain/repositories/IPropertyStatusHistoryRepository";
 import { IGeocodingService } from "@/domain/services/IGeocodingService";
 import { IClock } from "@/domain/services/IClock";
-import { NotFoundError } from "@/domain/errors/AppError";
+import { ForbiddenError, NotFoundError } from "@/domain/errors/AppError";
 import {
   Facing,
   FurnishedStatus,
   PropertyStatus,
   PropertyType,
 } from "@/domain/entities/Property";
-import { assertOwnerOrAdmin } from "./shared/authorization";
+import { assertOwnerOrAdmin, PROPERTY_ADMIN_ROLES } from "./shared/authorization";
 import { PropertyDetailLoader } from "./shared/PropertyDetailLoader";
 
 export interface UpdatePropertyInput {
@@ -93,6 +93,32 @@ export class UpdatePropertyUseCase {
 
     const statusChanged = input.status !== undefined && input.status !== existing.status;
     if (statusChanged) {
+      const isAdmin = input.requesterRoles.some((role) =>
+        (PROPERTY_ADMIN_ROLES as readonly string[]).includes(role),
+      );
+
+      // Security fix: this endpoint is owner-facing (PATCH /properties/:id,
+      // gated only by `authenticate`, not an admin role) -- without this
+      // check a property_owner could self-publish a listing that was never
+      // reviewed, or simply PATCH a status straight back to "published"
+      // right after an admin hid it for a policy violation, undermining
+      // moderation entirely. Admin-role requesters are unrestricted (their
+      // real moderation path is ApproveProperty/BulkModerateProperties,
+      // which already enforce their own admin-only authorization -- this
+      // only tightens the *owner* path).
+      if (!isAdmin) {
+        if (input.status === "published") {
+          throw new ForbiddenError(
+            "Only an admin can publish a listing. Submit it for review instead.",
+          );
+        }
+        if (existing.status === "inactive") {
+          throw new ForbiddenError(
+            "This listing was hidden by an admin and can't be reactivated by its owner.",
+          );
+        }
+      }
+
       patch.status = input.status;
       if (input.status === "published" && !existing.publishedAt) {
         patch.publishedAt = this.clock.now();

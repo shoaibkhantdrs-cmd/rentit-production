@@ -13,7 +13,7 @@ export function ErrorState({ title = "Something went wrong", message, onRetry }:
       <h3>{title}</h3>
       <p>{message}</p>
       {onRetry ? (
-        <button type="button" className="btn btn--secondary" onClick={onRetry}>
+        <button type="button" className="btn-v2 btn-v2--secondary" onClick={onRetry}>
           Try again
         </button>
       ) : null}

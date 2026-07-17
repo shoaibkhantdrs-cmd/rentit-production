@@ -42,6 +42,11 @@ function SavedSearchRow({
       onChanged();
     } catch (err) {
       setRowError(err instanceof ApiError ? err.message : "Could not delete this saved search.");
+    } finally {
+      // Bug fix (QA report #4): busy used to only get cleared on the
+      // catch path, relying on onChanged()'s reload to unmount the row on
+      // success. If that reload is slow or doesn't remove the row, Delete
+      // stayed disabled with no way to retry.
       setBusy(false);
     }
   };
@@ -62,7 +67,7 @@ function SavedSearchRow({
           <input type="checkbox" checked={savedSearch.notifyOnMatch} disabled={busy} onChange={toggleNotify} />
           Notify me
         </label>
-        <button type="button" className="btn btn--danger btn--sm" onClick={remove} disabled={busy}>
+        <button type="button" className="btn-v2 btn-v2--danger btn-v2--sm" onClick={remove} disabled={busy}>
           Delete
         </button>
       </div>
@@ -80,7 +85,7 @@ function SavedSearchesList() {
           <h1>Saved searches</h1>
           <p>We'll notify you when a new listing matches one of these.</p>
         </div>
-        <Link to="/search" className="btn btn--primary">
+        <Link to="/search" className="btn-v2 btn-v2--primary">
           Start a new search
         </Link>
       </div>
@@ -106,7 +111,7 @@ function SavedSearchesList() {
           title="No saved searches yet"
           description='Run a search, then click "Save this search" to get notified about new matches.'
           action={
-            <Link to="/search" className="btn btn--primary">
+            <Link to="/search" className="btn-v2 btn-v2--primary">
               Go to search
             </Link>
           }

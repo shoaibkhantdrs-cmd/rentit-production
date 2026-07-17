@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { chatApi } from "@/api/chat";
 import { useChatSocket } from "@/hooks/useChatSocket";
 import { useAuth } from "@/context/AuthContext";
@@ -59,13 +59,26 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return (
-    <ChatContext.Provider value={{ unreadCount, refreshUnreadCount, subscribe, sendSocket: send }}>
-      {children}
-    </ChatContext.Provider>
+  // Perf fix: this was a fresh object literal every ChatProvider render --
+  // and ChatProvider re-renders on every unread-count change (i.e. every
+  // inbound message) plus every upstream AuthContext change, since
+  // isAuthenticated is read via useAuth() here. Layout.tsx (mounted on
+  // every route) and any open conversation thread both consume this
+  // context, so an unmemoized value re-rendered them on every unrelated
+  // unread-count bump. `send` is now a stable useCallback reference from
+  // useChatSocket, so memoizing this wrapper object is enough -- same
+  // pattern as Toast.tsx's ToastContext fix.
+  const value = useMemo<ChatContextValue>(
+    () => ({ unreadCount, refreshUnreadCount, subscribe, sendSocket: send }),
+    [unreadCount, refreshUnreadCount, subscribe, send],
   );
+
+  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 
+// Hook intentionally lives alongside its Provider; see Toast.tsx for the
+// same documented tradeoff.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useChat(): ChatContextValue {
   const ctx = useContext(ChatContext);
   if (!ctx) throw new Error("useChat must be used within a ChatProvider");

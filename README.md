@@ -72,3 +72,5 @@ rentit/
 
 See `backend/db/README.md` for database/migration conventions and
 `docs/phase-2.md` for the full Phase 2 reference.
+
+ DATABASE_URL="postgresql://neondb_owner:npg_iRrEIXlhaK56@ep-lingering-mode-awx3vmz5.c-12.us-east-1.aws.neon.tech/neondb?sslmode=require"

@@ -30,6 +30,15 @@ export class PropertyFavoriteRepository implements IPropertyFavoriteRepository {
     return result.rows[0].exists;
   }
 
+  async listFavoritedPropertyIds(userId: string, propertyIds: string[]): Promise<string[]> {
+    if (propertyIds.length === 0) return [];
+    const result = await this.pool.query<{ property_id: string }>(
+      "SELECT property_id FROM property_favorites WHERE user_id = $1 AND property_id = ANY($2::uuid[])",
+      [userId, propertyIds],
+    );
+    return result.rows.map((r) => r.property_id);
+  }
+
   async listPropertyIdsForUser(
     userId: string,
     page: number,

@@ -1,0 +1,13 @@
+# Phase 6 Part 4 (observability): auto-loads the starter dashboard JSON
+# in ../../dashboards/ on Grafana startup.
+apiVersion: 1
+
+providers:
+  - name: "RentIt"
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

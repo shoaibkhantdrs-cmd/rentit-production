@@ -62,7 +62,12 @@ export class WebSocketGateway implements IRealtimeGateway {
   attach(server: Server): void {
     server.on("upgrade", (req, socket, head) => {
       try {
-        this.handleUpgrade(req, socket, head);
+        // @types/node types this event's socket as the generic
+        // `stream.Duplex` (its EventEmitter overload has widened over
+        // time), but for both `http.Server` and `https.Server` this is
+        // always a real `net.Socket` at runtime -- the same cast every
+        // hand-rolled/`ws`-style upgrade handler makes at this boundary.
+        this.handleUpgrade(req, socket as Socket, head);
       } catch (err) {
         logger.warn({ err }, "WebSocket upgrade failed");
         socket.destroy();

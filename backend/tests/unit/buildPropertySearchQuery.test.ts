@@ -18,7 +18,11 @@ test("buildPropertySearchQuery: no filters -- base conditions + pagination only"
 
   assert.match(itemsQuery, /p\.deleted_at IS NULL/);
   assert.match(itemsQuery, /p\.status = 'published'/);
-  assert.match(itemsQuery, /ORDER BY p\.created_at DESC/);
+  // ORDER BY applies to the outer `SELECT * FROM (...) sub` wrapper (added
+  // for radius-search distance filtering), so it correctly references the
+  // unqualified/sub-scoped column name here, not `p.` -- there is no `p`
+  // alias in scope outside the subquery.
+  assert.match(itemsQuery, /ORDER BY created_at DESC/);
   assert.match(itemsQuery, /LIMIT \$1 OFFSET \$2/);
   assert.deepEqual(itemsValues, [20, 0]);
 
@@ -34,11 +38,13 @@ test("buildPropertySearchQuery: page 3 computes the correct offset", () => {
 });
 
 test("buildPropertySearchQuery: each sort option maps to the right ORDER BY clause", () => {
+  // Same as above: ORDER BY sits outside the `sub` subquery wrapper, so
+  // these are unqualified column names, not `p.`-prefixed.
   const cases: Array<[PropertySearchOptions["sort"], RegExp]> = [
-    ["newest", /ORDER BY p\.created_at DESC/],
-    ["most_viewed", /ORDER BY p\.view_count DESC/],
-    ["price_low_to_high", /ORDER BY p\.rent_amount ASC/],
-    ["price_high_to_low", /ORDER BY p\.rent_amount DESC/],
+    ["newest", /ORDER BY created_at DESC/],
+    ["most_viewed", /ORDER BY view_count DESC/],
+    ["price_low_to_high", /ORDER BY rent_amount ASC/],
+    ["price_high_to_low", /ORDER BY rent_amount DESC/],
   ];
   for (const [sort, pattern] of cases) {
     const { itemsQuery } = buildPropertySearchQuery(baseOptions({ sort }));
@@ -93,7 +99,7 @@ test("buildPropertySearchQuery: complex filter combo + radius search indexes par
   assert.match(itemsQuery, /pl\.longitude BETWEEN \$7 AND \$8/);
   assert.match(itemsQuery, /distance_km <= \$11/);
   assert.match(itemsQuery, /LIMIT \$12 OFFSET \$13/);
-  assert.match(itemsQuery, /ORDER BY p\.rent_amount ASC/);
+  assert.match(itemsQuery, /ORDER BY rent_amount ASC/);
 
   // offset = (2-1)*25 = 25
   assert.equal(itemsValues[itemsValues.length - 2], 25);

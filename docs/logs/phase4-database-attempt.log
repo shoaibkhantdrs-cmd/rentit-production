@@ -1,0 +1,21 @@
+=== Phase 4: real Postgres feasibility check ===
+--- whoami/id ---
+zealous-gracious-einstein
+uid=1011(zealous-gracious-einstein) gid=1011(zealous-gracious-einstein) groups=1011(zealous-gracious-einstein)
+--- sudo ---
+sudo: /etc/sudo.conf is owned by uid 65534, should be 0
+sudo: The "no new privileges" flag is set, which prevents sudo from running as root.
+sudo: If sudo is running in a container, you may need to adjust the container configuration to disable the flag.
+sudo unavailable (no root, no-new-privileges set)
+--- psql/pg_ctl/postgres binary search ---
+none found on PATH
+--- apt-get update (no sudo) ---
+Reading package lists...
+E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
+E: Unable to lock directory /var/lib/apt/lists/
+W: Problem unlinking the file /var/cache/apt/pkgcache.bin - RemoveCaches (13: Permission denied)
+W: Problem unlinking the file /var/cache/apt/srcpkgcache.bin - RemoveCaches (13: Permission denied)
+--- OS mirror reachability ---
+HTTP/1.1 403 Forbidden
+Content-Type: text/plain
+RESULT: no root/sudo, no OS package mirror access, no postgres binary present -- migrations statically verified only (see phase-6-audit.md sec 4).

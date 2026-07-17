@@ -1,0 +1,62 @@
+Phase 6 Part 9 - Final QA: security audit re-pass over Parts 4-8
+
+Part 2 (docs/phase-6-part2-security-audit.md) already covered
+authentication/authorization/rate-limiting/SQLi/XSS/CSRF/SSRF/CORS/
+secrets/OWASP for the whole system through Part 1. This pass specifically
+re-examined everything ADDED in Parts 4 through 8 for the same categories,
+rather than re-running the entire original audit a second time.
+
+Real finding + fix:
+- metrics.routes.ts (Part 4) compared the Authorization header against
+  the expected bearer token with plain `!==` instead of this codebase's
+  established timingSafeEqual pattern (already used in JwtTokenService.ts
+  and both payment gateways' webhook signature checks). A `!==` string
+  comparison leaks how many leading bytes matched via response timing --
+  low real-world severity here (an internal metrics token, not a
+  high-value credential) but inconsistent with how every other secret
+  comparison in this app is written, and cheap to fix correctly. FIXED:
+  now buffers both sides, checks length first (timingSafeEqual throws on
+  a length mismatch rather than returning false), then timingSafeEqual.
+  Verified standalone: 6/6 checks pass (correct token accepted, wrong
+  token rejected, missing header rejected, different-length token
+  rejected without throwing, unset METRICS_TOKEN leaves the endpoint
+  open as documented, empty-string header rejected).
+
+Reviewed, no issues found:
+- Sentry/NoOp error tracker (Part 4): SentryErrorTracker's captured
+  payload includes requestId/userId/route/method/statusCode and an
+  `extra` bag the caller controls -- errorHandler.ts only ever passes
+  those five specific fields, never the raw request body or headers, so
+  no risk of a payment/auth payload leaking into a third-party error
+  tracking service via this path.
+- Backup/restore scripts (Part 5): DATABASE_URL is read from the
+  environment, never hardcoded or logged; restore-db.sh requires typing
+  "restore" to confirm before running --clean (destructive) against
+  whatever DATABASE_URL happens to be set to.
+- CI/CD (Part 6): GITHUB_TOKEN used for the GHCR push has its default,
+  auto-scoped, run-limited permissions (packages: write only, explicitly
+  set) rather than a long-lived PAT; deploy.yml's SSH credentials are
+  GitHub Secrets, never echoed in any step. Docker prod images (Part 6)
+  run as the non-root `node` user in both Dockerfiles.
+- .gitignore (Part 6): fixed during that pass already -- .env.production
+  was not previously matched by any ignore rule (only .env.production.local
+  was) and could have been committed with real production secrets in it.
+  Re-verified in this pass with `git check-ignore`: .env/.env.production/
+  .env.local all still correctly ignored, .env.example/.env.production.example/
+  backend/.env.example all still correctly tracked.
+- Capacitor config (Part 7): androidScheme/iosScheme set to "https" (not
+  Capacitor's default "http" on Android), no secrets embedded in
+  capacitor.config.ts or the native project scaffold instructions.
+- Service worker (Part 7): re-confirmed it never intercepts non-GET
+  requests, same-origin /api/ paths, or cross-origin requests -- so it
+  cannot serve stale/cached responses for any auth, payment, or messaging
+  endpoint (originally verified in Part 7, re-checked here in the
+  security-audit context specifically).
+- Deployment guides (Part 8): all example credentials/keys in every guide
+  are placeholders (your-api-key, replace_with_a_64_byte_random_hex_secret,
+  etc.); guides explicitly recommend separate credentials per environment
+  and least-privilege API key restrictions (Google Maps IP-restriction,
+  Cloudinary separate accounts) rather than reusing one set of credentials
+  across dev/staging/production.
+
+No other new issues found in this pass.

@@ -1,0 +1,79 @@
+Phase 6 Part 9 - Final QA: real typecheck run against the actual source
+
+Discovery: this sandbox has no npm registry access (confirmed again, same
+as every earlier phase), so no third-party package types (@types/node,
+@types/react, express, pg, zod, react, react-router-dom, etc.) are
+installed in either backend/node_modules or frontend/node_modules.
+HOWEVER, a real TypeScript compiler (v6.0.3) and tsx (v4.22.4) ARE
+present globally at /usr/local/lib/node_modules_global/bin/ (not on PATH
+by default) -- discovered and used for the first time in this session
+during Part 9. This made two previously-impossible checks possible for
+real: an actual `tsc --noEmit` run, and an actual `node --test` run of
+every real test file (see phase6-part9-full-test-suite-run.log).
+
+tsc --noEmit was run with one non-functional accommodation: a throwaway
+config extending the real tsconfig.json/tsconfig.app.json with
+"ignoreDeprecations": "6.0" added, ONLY to stop TS 6.0.3 from refusing to
+even start over "moduleResolution: node"/"baseUrl" being marked
+deprecated-in-a-future-major-version -- this flag changes no compiled
+output and was never added to the real committed tsconfig files (which
+target the project's actual pinned `typescript: ^5.5.4`).
+
+Backend: 313 errors on first run. Manually triaged every one. 311 were
+directly attributable to a missing npm package (Cannot find module
+'express'/'pg'/'zod'/'dotenv'/etc, Cannot find name 'process'/'Buffer'/
+'console'/'fetch'/'URL' from missing @types/node, ZodError/Multer/etc
+losing their real shape without their type packages) -- confirmed
+resolvable purely by installing real dependencies, not real code bugs.
+2 were real: PropertyDetailDTO.ts imported PropertyLocation and
+PropertyImage but never used either (both fields are defined as inline
+object literal types instead) -- FIXED by removing the two unused
+imports. Re-ran after the fix: 311 errors (down from 313 by exactly 2),
+confirming the fix and no regression. Full test suite re-run after the
+fix: still 184/184 passing.
+
+A separate, security-motivated fix made later in this same Part 9 pass
+(metrics.routes.ts's bearer-token check used `!==` instead of this
+codebase's established timingSafeEqual pattern -- see
+phase6-part9-security-audit.log) added 3 new "Cannot find name
+'Buffer'/'node:crypto'" entries to this same missing-@types/node bucket
+(314 total after that fix) -- confirmed via a targeted re-run that these
+3 are the same environmental cascade as everything else in this
+category, not new real bugs.
+
+Frontend: 2154 errors on first run, essentially all attributable to
+@types/react/@types/react-dom/vite/react-router-dom being uninstalled
+(1937 alone were "JSX element implicitly has type any because no
+interface JSX.IntrinsicElements exists" -- the single most common
+cascade from missing @types/react). Manually triaged every distinct
+error code (TS7026, TS7006, TS2307, TS2875, TS2322, TS7031, TS2503,
+TS2882, TS2345, TS2339) rather than assuming the count meant nothing was
+worth checking. One real, environment-independent bug found:
+src/api/admin.ts's searchProperties() passed a named-interface-typed
+`filters: AdminPropertySearchFilters` variable directly into a
+Record<string, ...>-typed parameter, which TypeScript's structural
+index-signature check rejects for named interfaces (it accepts fresh
+object literals more leniently) -- this is a real TS rule that applies
+under the project's own pinned TypeScript version too, not a
+sandbox-only quirk. FIXED by spreading into a fresh literal:
+`{ ...filters }`. Re-ran after the fix: 2153 errors (down from 2154 by
+exactly 1), confirming the fix and no regression.
+
+Every other error code was manually reviewed and confirmed as a cascade
+from a missing package (e.g. AdminAnalyticsRepository.ts's "unknown"-typed
+reduce() and ImageUploadManager.tsx's "unknown[] not assignable to
+File[]" both stem from generic type parameters on methods whose
+declaring class comes from an unresolvable "pg"/DOM-lib-via-@types/react
+import; the ~9 "key" prop TS2322 errors across page components are
+React's own special-cased `key` prop not being excluded from prop
+checking without @types/react's JSX.LibraryManagedAttributes machinery).
+None of these were "fixed" since doing so would mean changing correct
+code to work around an absent dependency, which would not match how the
+project's own pinned TypeScript version behaves once real npm install
+has run.
+
+Recommendation before a real production build: run `npm install` for
+real in both backend/ and frontend/ (see docs/phase-6-part6-cicd.md's
+lockfile gap note) and re-run `tsc --noEmit` in each -- with real
+packages installed, expect the error count to drop to at or near zero
+given the above triage.

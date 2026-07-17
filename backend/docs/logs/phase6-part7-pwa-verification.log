@@ -1,0 +1,36 @@
+Phase 6 Part 7 - PWA verification
+(run against the ACTUAL frontend/public/sw.js and
+frontend/public/manifest.webmanifest files)
+
+manifest.webmanifest:
+- VALID JSON
+- PASS: has name, short_name, start_url, display=standalone
+- PASS: has a 192x192 icon
+- PASS: has a 512x512 icon
+- PASS: has a maskable-purpose icon
+(the above are Chrome's actual PWA installability criteria for the
+manifest half of the check -- the other half, a fetch-handling service
+worker, is verified below)
+
+sw.js (run against a fake ServiceWorkerGlobalScope + Cache API + fetch,
+simulating install/activate/fetch events -- routing logic under test is
+the real, unmodified file):
+1. PASS - install event precaches the known app-shell URLs
+2. PASS - activate event deletes old-versioned caches
+3. PASS - activate event keeps the current-versioned cache
+4. PASS - fetch to a same-origin /api/ path is never intercepted (always network)
+5. PASS - fetch to a cross-origin URL is never intercepted (always network)
+6. PASS - a non-GET (POST/etc) fetch is never intercepted
+7. PASS - a navigation request falls back to the cached app shell when the network fails
+8. PASS - an uncached static asset request goes to the network
+9. PASS - that static asset's response gets written into the runtime cache
+
+9/9 checks passed. This confirms the service worker never touches
+mutating requests or API calls (the actively-harmful case for a rentals/
+payments app) while still providing a working offline app-shell fallback.
+
+Node.js has no real ServiceWorkerGlobalScope, so this cannot be a
+substitute for testing in an actual browser (Chrome DevTools ->
+Application -> Service Workers, and Lighthouse's PWA audit) before
+relying on this for a real launch -- noted in
+docs/phase-6-part7-mobile.md.

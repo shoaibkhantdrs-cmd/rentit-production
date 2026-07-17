@@ -1,0 +1,21 @@
+Phase 6 Part 4 - metrics.ts standalone verification
+Command: node --experimental-transform-types run.ts
+(run against a copy of the ACTUAL production file
+backend/src/infrastructure/observability/metrics.ts, simulating 4 requests
+through metricsMiddleware() then asserting on renderMetrics() output)
+
+Result: 6/6 PASS
+- PASS: has HELP lines
+- PASS: has TYPE lines
+- PASS: counts GET /payments/plans as 2
+- PASS: has histogram bucket
+- PASS: has +Inf bucket
+- PASS: has memory metrics
+
+Fix applied during this verification: metrics.ts imported
+{ NextFunction, Request, Response } from "express" as a plain (non-type)
+import. Under Node's --experimental-transform-types (no cross-file type
+analysis), this fails at runtime with ERR_MODULE_NOT_FOUND since express
+is not installed in this sandbox. Changed to `import type { ... }` --
+correct either way under a real tsc build, and necessary for this
+sandbox's file-execution verification method.

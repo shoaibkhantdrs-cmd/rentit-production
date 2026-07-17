@@ -376,7 +376,7 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
             />
           </div>
         </div>
-        <button type="button" className="btn btn--secondary btn--sm" onClick={useCurrentLocation}>
+        <button type="button" className="btn-v2 btn-v2--secondary btn-v2--sm" onClick={useCurrentLocation}>
           Use current location
         </button>
         {geoStatus ? <p className="field-hint">{geoStatus}</p> : null}
@@ -401,7 +401,7 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
         </div>
       </div>
 
-      <button type="submit" className="btn btn--primary" disabled={submitting}>
+      <button type="submit" className="btn-v2 btn-v2--primary" disabled={submitting}>
         {submitting ? "Saving..." : submitLabel}
       </button>
     </form>

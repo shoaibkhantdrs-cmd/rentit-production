@@ -19,7 +19,12 @@ export function UserDetailPage() {
 
   const activity = useAsync(() => adminApi.getUserActivity(id!, 1, 10), [id]);
 
-  const runAction = async (fn: () => Promise<unknown>, successMessage: string) => {
+  // RC1 bug fix: this always resolved (errors were caught, not rethrown),
+  // so every `.then(() => ...)` chained onto a call below ran even when
+  // the action had actually failed (e.g. "Delete account" would navigate
+  // away as if the delete succeeded). Now resolves `false` on failure so
+  // callers can check before proceeding.
+  const runAction = async (fn: () => Promise<unknown>, successMessage: string): Promise<boolean> => {
     setActionError(null);
     setActionMessage(null);
     setBusy(true);
@@ -27,8 +32,10 @@ export function UserDetailPage() {
       await fn();
       setActionMessage(successMessage);
       reload();
+      return true;
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Action failed. Please try again.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -129,7 +136,9 @@ export function UserDetailPage() {
               disabled={busy}
               onClick={() => {
                 if (!window.confirm(`Delete ${data.name}'s account? This cannot be undone.`)) return;
-                runAction(() => adminApi.deleteUser(data.id), "User deleted.").then(() => navigate("/admin/users"));
+                runAction(() => adminApi.deleteUser(data.id), "User deleted.").then((ok) => {
+                  if (ok) navigate("/admin/users");
+                });
               }}
             >
               Delete account
@@ -146,9 +155,9 @@ export function UserDetailPage() {
               className="btn btn--primary btn--sm"
               disabled={busy}
               onClick={() =>
-                runAction(() => adminApi.updateUserRoles(data.id, roles), "Roles updated.").then(() =>
-                  setSelectedRoles(null),
-                )
+                runAction(() => adminApi.updateUserRoles(data.id, roles), "Roles updated.").then((ok) => {
+                  if (ok) setSelectedRoles(null);
+                })
               }
             >
               Save roles

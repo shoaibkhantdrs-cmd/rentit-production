@@ -48,6 +48,29 @@ export class NotificationRepository implements INotificationRepository {
     return toEntity(result.rows[0]);
   }
 
+  async createMany(inputs: NewNotificationInput[]): Promise<Notification[]> {
+    if (inputs.length === 0) return [];
+    // One round trip regardless of row count, via unnest() over per-column
+    // arrays -- avoids both the N-sequential-INSERTs problem this replaces
+    // and a hand-built multi-row VALUES list's per-row placeholder count
+    // (5 x 5000 rows would still be well under Postgres's param limit, but
+    // unnest keeps this at a constant 5 params no matter how large a
+    // broadcast gets).
+    const result = await this.pool.query<NotificationRow>(
+      `INSERT INTO notifications (user_id, type, title, body, data)
+       SELECT * FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::jsonb[])
+       RETURNING *`,
+      [
+        inputs.map((i) => i.userId),
+        inputs.map((i) => i.type),
+        inputs.map((i) => i.title),
+        inputs.map((i) => i.body),
+        inputs.map((i) => JSON.stringify(i.data ?? {})),
+      ],
+    );
+    return result.rows.map(toEntity);
+  }
+
   async listForUser(
     userId: string,
     options: ListNotificationsOptions,

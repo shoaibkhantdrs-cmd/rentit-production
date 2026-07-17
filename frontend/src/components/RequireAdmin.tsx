@@ -9,7 +9,12 @@ const ADMIN_ROLES = ["admin", "super_admin"];
  * without an admin role -> a plain "not authorized" state (never a blank
  * page or a silent redirect loop). */
 export function RequireAdmin({ children }: { children: ReactNode }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, authReady } = useAuth();
+
+  // Bug fix (QA report #23): same fix as RequireAuth -- avoids a one-
+  // frame flash of the signed-out fallback while dev auto-login is
+  // still resolving. Always true synchronously in production.
+  if (!authReady) return null;
 
   if (!isAuthenticated) {
     return <AuthPanel message="Sign in with an admin account to continue." />;

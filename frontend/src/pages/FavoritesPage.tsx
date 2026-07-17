@@ -30,7 +30,7 @@ function FavoritesList() {
           title="No favorites yet"
           description="Save listings you're interested in and they'll show up here."
           action={
-            <a href="/search" className="btn btn--primary">
+            <a href="/search" className="btn-v2 btn-v2--primary">
               Browse listings
             </a>
           }
@@ -39,7 +39,7 @@ function FavoritesList() {
 
       {status === "success" && data.items.length > 0 && (
         <>
-          <div className="property-grid">
+          <div className="property-grid-v2">
             {data.items.map((item) => (
               <PropertyCard key={item.id} property={item} />
             ))}

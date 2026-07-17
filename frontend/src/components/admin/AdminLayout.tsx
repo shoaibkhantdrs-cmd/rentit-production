@@ -49,6 +49,9 @@ function AdminShell() {
 
   return (
     <div className="admin-shell">
+      <a href="#admin-main-content" className="skip-link">
+        Skip to main content
+      </a>
       <aside className="admin-sidebar">
         <div className="admin-sidebar__brand">
           <NavLink to="/">RentIt</NavLink>
@@ -88,7 +91,7 @@ function AdminShell() {
             </button>
           </div>
         </header>
-        <main className="admin-content">
+        <main className="admin-content" id="admin-main-content" tabIndex={-1}>
           <Outlet />
         </main>
       </div>

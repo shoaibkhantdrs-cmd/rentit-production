@@ -49,6 +49,26 @@ export class UserRepository implements IUserRepository {
     return result.rows[0] ? toEntity(result.rows[0]) : null;
   }
 
+  // Regression fix (RC1 QA): this used to filter `deleted_at IS NULL`,
+  // while `findById` above (the single-item method this batches) does not.
+  // PropertyDetailLoader.loadMany() documents itself as producing a
+  // "byte-for-byte identical" shape to calling load() per item -- with the
+  // filter, a property owned by a soft-deleted user showed the real owner
+  // via the single-item path (PropertyDetailsPage) but `owner: null` via
+  // the batched path (Favorites/MyProperties/RecentlyViewed/
+  // Recommendations). Dropping the filter here (rather than adding it to
+  // findById, which is used far more broadly, including admin flows that
+  // intentionally need to see soft-deleted users) matches the narrower,
+  // already-correct scope of this specific N+1 fix.
+  async findManyByIds(ids: string[]): Promise<User[]> {
+    if (ids.length === 0) return [];
+    const result = await this.pool.query<UserRow>(
+      "SELECT * FROM users WHERE id = ANY($1::uuid[])",
+      [ids],
+    );
+    return result.rows.map(toEntity);
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     const result = await this.pool.query<UserRow>(
       "SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL",

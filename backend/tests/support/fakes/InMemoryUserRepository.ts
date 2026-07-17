@@ -24,6 +24,13 @@ export class InMemoryUserRepository implements IUserRepository {
     return this.users.get(id) ?? null;
   }
 
+  // Regression fix (RC1 QA): matches findById's leniency (no deletedAt
+  // filter) -- see UserRepository.ts's matching comment for why.
+  async findManyByIds(ids: string[]): Promise<User[]> {
+    const idSet = new Set(ids);
+    return Array.from(this.users.values()).filter((u) => idSet.has(u.id));
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     for (const user of this.users.values()) {
       if (user.email === email && !user.deletedAt) return user;

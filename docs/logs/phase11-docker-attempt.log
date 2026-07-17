@@ -1,0 +1,5 @@
+=== Phase 11/12: Docker feasibility check ===
+docker: command not found
+HTTP/1.1 403 Forbidden
+Content-Type: text/plain
+RESULT: docker binary not installed, Docker download mirror blocked -- cannot build/run containers in this sandbox. docker-compose.yml/Dockerfiles statically reviewed only (see phase-6-audit.md sec 1 and 9).

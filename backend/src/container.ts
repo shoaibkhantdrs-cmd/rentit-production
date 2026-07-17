@@ -8,6 +8,7 @@
  */
 import { pool } from "@/config/database";
 import { env } from "@/config/env";
+import { logger } from "@/infrastructure/logging/logger";
 
 // Infrastructure
 import { UserRepository } from "@/infrastructure/database/repositories/UserRepository";
@@ -42,6 +43,8 @@ import { GoogleGeocodingService } from "@/infrastructure/maps/GoogleGeocodingSer
 import { ConsolePushNotificationService } from "@/infrastructure/notifications/ConsolePushNotificationService";
 import { FcmPushNotificationService } from "@/infrastructure/notifications/FcmPushNotificationService";
 import { PostgresHealthCheckService } from "@/infrastructure/database/PostgresHealthCheckService";
+import { NoOpErrorTracker } from "@/infrastructure/errortracking/NoOpErrorTracker";
+import { SentryErrorTracker } from "@/infrastructure/errortracking/SentryErrorTracker";
 import { ConversationRepository } from "@/infrastructure/database/repositories/ConversationRepository";
 import { MessageRepository } from "@/infrastructure/database/repositories/MessageRepository";
 import { SavedSearchRepository } from "@/infrastructure/database/repositories/SavedSearchRepository";
@@ -53,6 +56,16 @@ import { TwilioSmsService } from "@/infrastructure/sms/TwilioSmsService";
 import { ChannelNotificationSender } from "@/infrastructure/notifications/ChannelNotificationSender";
 import { ConsoleWhatsAppService } from "@/infrastructure/whatsapp/ConsoleWhatsAppService";
 import { WhatsAppCloudApiService } from "@/infrastructure/whatsapp/WhatsAppCloudApiService";
+import { PremiumPlanRepository } from "@/infrastructure/database/repositories/PremiumPlanRepository";
+import { PaymentOrderRepository } from "@/infrastructure/database/repositories/PaymentOrderRepository";
+import { PaymentRepository } from "@/infrastructure/database/repositories/PaymentRepository";
+import { RefundRepository } from "@/infrastructure/database/repositories/RefundRepository";
+import { InvoiceRepository } from "@/infrastructure/database/repositories/InvoiceRepository";
+import { ListingBoostRepository } from "@/infrastructure/database/repositories/ListingBoostRepository";
+import { UserSubscriptionRepository } from "@/infrastructure/database/repositories/UserSubscriptionRepository";
+import { WebhookEventRepository } from "@/infrastructure/database/repositories/WebhookEventRepository";
+import { RazorpayPaymentGateway } from "@/infrastructure/payments/RazorpayPaymentGateway";
+import { StripePaymentGateway } from "@/infrastructure/payments/StripePaymentGateway";
 
 // Application (shared)
 import { SessionIssuer } from "@/application/auth/shared/SessionIssuer";
@@ -69,6 +82,7 @@ import { LogoutUserUseCase } from "@/application/auth/LogoutUser.usecase";
 import { LogoutAllDevicesUseCase } from "@/application/auth/LogoutAllDevices.usecase";
 import { ForgotPasswordUseCase } from "@/application/auth/ForgotPassword.usecase";
 import { ResetPasswordUseCase } from "@/application/auth/ResetPassword.usecase";
+import { DevAutoLoginUseCase } from "@/application/auth/DevAutoLogin.usecase";
 import { GetMeUseCase } from "@/application/users/GetMe.usecase";
 import { UpdateMeUseCase } from "@/application/users/UpdateMe.usecase";
 import { DeleteMeUseCase } from "@/application/users/DeleteMe.usecase";
@@ -121,6 +135,20 @@ import { UpdateSavedSearchUseCase } from "@/application/savedsearches/UpdateSave
 import { DeleteSavedSearchUseCase } from "@/application/savedsearches/DeleteSavedSearch.usecase";
 import { NotifySavedSearchesForPropertyUseCase } from "@/application/savedsearches/NotifySavedSearchesForProperty.usecase";
 
+// Application (payments, Phase 6 Part 1)
+import { PaymentActivator } from "@/application/payments/shared/PaymentActivator";
+import { CreateListingBoostOrderUseCase } from "@/application/payments/CreateListingBoostOrder.usecase";
+import { CreatePremiumPlanOrderUseCase } from "@/application/payments/CreatePremiumPlanOrder.usecase";
+import { ListPremiumPlansUseCase } from "@/application/payments/ListPremiumPlans.usecase";
+import { GetPaymentHistoryUseCase } from "@/application/payments/GetPaymentHistory.usecase";
+import { GetInvoiceUseCase, ListMyInvoicesUseCase } from "@/application/payments/GetInvoice.usecase";
+import { HandlePaymentWebhookUseCase } from "@/application/payments/HandlePaymentWebhook.usecase";
+import { AdminRefundPaymentUseCase } from "@/application/payments/AdminRefundPayment.usecase";
+import {
+  AdminListPaymentsUseCase,
+  AdminListRefundsForPaymentUseCase,
+} from "@/application/payments/AdminListPayments.usecase";
+
 // Application (admin use-cases, Phase 4)
 import { SearchUsersUseCase } from "@/application/admin/users/SearchUsers.usecase";
 import { GetUserProfileUseCase } from "@/application/admin/users/GetUserProfile.usecase";
@@ -170,9 +198,17 @@ import { AdminAuditController } from "@/interfaces/http/controllers/AdminAuditCo
 import { ChatController } from "@/interfaces/http/controllers/ChatController";
 import { WhatsAppController } from "@/interfaces/http/controllers/WhatsAppController";
 import { SavedSearchController } from "@/interfaces/http/controllers/SavedSearchController";
+import { PaymentController } from "@/interfaces/http/controllers/PaymentController";
+import { WebhookController } from "@/interfaces/http/controllers/WebhookController";
+import { AdminPaymentController } from "@/interfaces/http/controllers/AdminPaymentController";
 import { authenticate as authenticateFactory } from "@/interfaces/http/middleware/authenticate";
 import { optionalAuthenticate as optionalAuthenticateFactory } from "@/interfaces/http/middleware/optionalAuthenticate";
-import { createAuthRateLimiter } from "@/interfaces/http/middleware/rateLimiter";
+import {
+  createAuthRateLimiter,
+  createMessagingRateLimiter,
+  createWebhookRateLimiter,
+  createPaymentOrderRateLimiter,
+} from "@/interfaces/http/middleware/rateLimiter";
 
 export function buildContainer() {
   // --- infrastructure ---
@@ -204,9 +240,27 @@ export function buildContainer() {
   const messageRepo = new MessageRepository(pool);
   const savedSearchRepo = new SavedSearchRepository(pool);
 
+  // --- Phase 6 Part 1: Payments ---
+  const premiumPlanRepo = new PremiumPlanRepository(pool);
+  const paymentOrderRepo = new PaymentOrderRepository(pool);
+  const paymentRepo = new PaymentRepository(pool);
+  const refundRepo = new RefundRepository(pool);
+  const invoiceRepo = new InvoiceRepository(pool);
+  const listingBoostRepo = new ListingBoostRepository(pool);
+  const userSubscriptionRepo = new UserSubscriptionRepository(pool);
+  const webhookEventRepo = new WebhookEventRepository(pool);
+
   const imageStorage = new CloudinaryImageStorageService(env.cloudinary);
   const geocodingService = new GoogleGeocodingService(env.googleMapsApiKey);
   const healthCheckService = new PostgresHealthCheckService(pool);
+
+  // Phase 6 Part 4 (observability): only wire the real Sentry HTTP client
+  // when a DSN is actually configured, so local dev/test never make an
+  // outbound network call on every error -- errors still reach the
+  // structured logger either way via NoOpErrorTracker.
+  const errorTracker = env.sentry.dsn
+    ? new SentryErrorTracker(env.sentry.dsn, logger, env.nodeEnv, env.sentry.release)
+    : new NoOpErrorTracker(logger);
 
   const hasher = new BcryptHasher(env.bcryptSaltRounds);
   const tokenService = new JwtTokenService({
@@ -241,6 +295,19 @@ export function buildContainer() {
   const whatsAppService = env.whatsapp.phoneNumberId
     ? new WhatsAppCloudApiService(env.whatsapp)
     : new ConsoleWhatsAppService();
+
+  // --- Phase 6 Part 1: payment gateways ---
+  // Both are always constructed (unlike the "real vs console fallback"
+  // pattern above) because createOrder/createRefund need to work the
+  // moment real keys are added, and an unconfigured gateway simply isn't
+  // selectable from the frontend's gateway dropdown until its env vars
+  // are set -- there's no safe no-op fallback for "charge a card".
+  const razorpayGateway = new RazorpayPaymentGateway(env.razorpay);
+  const stripeGateway = new StripePaymentGateway({
+    secretKey: env.stripe.secretKey,
+    webhookSecret: env.stripe.webhookSecret,
+  });
+  const paymentGateways = { razorpay: razorpayGateway, stripe: stripeGateway } as const;
 
   const authConfig: AuthConfig = {
     accessTokenTtlSeconds: env.jwt.accessTokenTtlSeconds,
@@ -320,6 +387,26 @@ export function buildContainer() {
     hasher,
     otpVerifier,
   );
+
+  // Dev-only auto-login (never sends email, never requires an OTP): only
+  // ever constructed when NODE_ENV=development. `null` in every other
+  // environment, including production and test -- AuthController accepts
+  // `null` here and auth.routes.ts never even registers the route that
+  // would call it outside development, so this is two independent layers
+  // of the same guard, not just one `if`.
+  const devAutoLogin =
+    env.nodeEnv === "development"
+      ? new DevAutoLoginUseCase(
+          env.nodeEnv,
+          userRepo,
+          roleRepo,
+          userRoleRepo,
+          userPreferenceRepo,
+          auditLogRepo,
+          sessionIssuer,
+          clock,
+        )
+      : null;
 
   const getMe = new GetMeUseCase(userRepo, userRoleRepo, userPreferenceRepo);
   const updateMe = new UpdateMeUseCase(
@@ -584,6 +671,77 @@ export function buildContainer() {
   // --- admin: system health (Phase 4 Part 1) ---
   const getSystemHealth = new GetSystemHealthUseCase(healthCheckService);
 
+  // --- payments (Phase 6 Part 1) ---
+  const paymentActivator = new PaymentActivator(
+    listingBoostRepo,
+    userSubscriptionRepo,
+    premiumPlanRepo,
+    {
+      currency: env.payments.currency,
+      featuredListingPriceAmount: env.payments.featuredListingPriceAmount,
+      featuredListingDurationDays: env.payments.featuredListingDurationDays,
+      boostListingPriceAmount: env.payments.boostListingPriceAmount,
+      boostListingDurationDays: env.payments.boostListingDurationDays,
+    },
+    clock,
+  );
+  const createListingBoostOrder = new CreateListingBoostOrderUseCase(
+    propertyRepo,
+    listingBoostRepo,
+    paymentOrderRepo,
+    paymentGateways,
+    {
+      currency: env.payments.currency,
+      featuredListingPriceAmount: env.payments.featuredListingPriceAmount,
+      featuredListingDurationDays: env.payments.featuredListingDurationDays,
+      boostListingPriceAmount: env.payments.boostListingPriceAmount,
+      boostListingDurationDays: env.payments.boostListingDurationDays,
+    },
+  );
+  const createPremiumPlanOrder = new CreatePremiumPlanOrderUseCase(
+    premiumPlanRepo,
+    userSubscriptionRepo,
+    paymentOrderRepo,
+    paymentGateways,
+  );
+  const listPremiumPlans = new ListPremiumPlansUseCase(premiumPlanRepo);
+  const getPaymentHistory = new GetPaymentHistoryUseCase(paymentRepo);
+  const getInvoice = new GetInvoiceUseCase(invoiceRepo);
+  const listMyInvoices = new ListMyInvoicesUseCase(invoiceRepo);
+
+  // Two instances of the same use-case class, one per gateway -- see
+  // HandlePaymentWebhook.usecase.ts's doc comment for why the branching
+  // logic itself isn't duplicated per provider.
+  const handleRazorpayWebhook = new HandlePaymentWebhookUseCase(
+    razorpayGateway,
+    webhookEventRepo,
+    paymentOrderRepo,
+    paymentRepo,
+    refundRepo,
+    invoiceRepo,
+    paymentActivator,
+    logger,
+  );
+  const handleStripeWebhook = new HandlePaymentWebhookUseCase(
+    stripeGateway,
+    webhookEventRepo,
+    paymentOrderRepo,
+    paymentRepo,
+    refundRepo,
+    invoiceRepo,
+    paymentActivator,
+    logger,
+  );
+
+  const adminRefundPayment = new AdminRefundPaymentUseCase(
+    paymentRepo,
+    refundRepo,
+    paymentGateways,
+    auditLogRepo,
+  );
+  const adminListPayments = new AdminListPaymentsUseCase(paymentRepo);
+  const adminListRefundsForPayment = new AdminListRefundsForPaymentUseCase(refundRepo);
+
   // --- interface layer ---
   const authController = new AuthController(
     registerUser,
@@ -594,6 +752,7 @@ export function buildContainer() {
     logoutAllDevices,
     forgotPassword,
     resetPassword,
+    devAutoLogin,
   );
   const userController = new UserController(getMe, updateMe, deleteMe, reportUser);
   const notificationController = new NotificationController(
@@ -685,9 +844,38 @@ export function buildContainer() {
     getRecommendations,
   );
 
+  const paymentController = new PaymentController(
+    createListingBoostOrder,
+    createPremiumPlanOrder,
+    listPremiumPlans,
+    getPaymentHistory,
+    getInvoice,
+    listMyInvoices,
+    { razorpayKeyId: env.razorpay.keyId, stripePublishableKey: env.stripe.publishableKey },
+  );
+  const webhookController = new WebhookController(handleRazorpayWebhook, handleStripeWebhook);
+  const adminPaymentController = new AdminPaymentController(
+    adminListPayments,
+    adminListRefundsForPayment,
+    adminRefundPayment,
+  );
+
   const authenticate = authenticateFactory(tokenService);
   const optionalAuthenticate = optionalAuthenticateFactory(tokenService);
   const authRateLimiter = createAuthRateLimiter(env.rateLimit.authWindowMs, env.rateLimit.authMax);
+  // Audit fix: chat/WhatsApp had no rate limiting at all (see docs/phase-6-audit.md).
+  const messagingRateLimiter = createMessagingRateLimiter(
+    env.rateLimit.messagingWindowMs,
+    env.rateLimit.messagingMax,
+  );
+  const webhookRateLimiter = createWebhookRateLimiter(
+    env.rateLimitWebhook.windowMs,
+    env.rateLimitWebhook.max,
+  );
+  const paymentOrderRateLimiter = createPaymentOrderRateLimiter(
+    env.rateLimitPaymentOrder.windowMs,
+    env.rateLimitPaymentOrder.max,
+  );
 
   return {
     authController,
@@ -698,6 +886,8 @@ export function buildContainer() {
     chatController,
     whatsAppController,
     savedSearchController,
+    paymentController,
+    webhookController,
     adminUserController,
     adminPropertyController,
     adminReportController,
@@ -705,10 +895,15 @@ export function buildContainer() {
     adminNotificationController,
     adminDashboardController,
     adminAuditController,
+    adminPaymentController,
     authenticate,
     optionalAuthenticate,
     authRateLimiter,
+    messagingRateLimiter,
+    webhookRateLimiter,
+    paymentOrderRateLimiter,
     realtimeGateway,
+    errorTracker,
   };
 }
 

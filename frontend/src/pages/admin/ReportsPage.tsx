@@ -130,15 +130,20 @@ function UserReportsTab() {
     }
   };
 
-  const ban = async (userId: string) => {
+  // RC1 bug fix: previously resolved even on failure, so the call site
+  // below marked the report "action_taken" even when the ban itself
+  // failed. Now resolves `false` on failure so the caller can check.
+  const ban = async (userId: string): Promise<boolean> => {
     const reason = window.prompt("Reason for banning this user:") ?? undefined;
     setActionError(null);
     setBusy(true);
     try {
       await adminApi.updateUserStatus(userId, "banned", reason);
       reload();
+      return true;
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Action failed.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -191,7 +196,11 @@ function UserReportsTab() {
                         <button
                           className="btn btn--danger btn--sm"
                           disabled={busy}
-                          onClick={() => ban(report.reportedUserId).then(() => resolve(report.id, "action_taken"))}
+                          onClick={() =>
+                            ban(report.reportedUserId).then((ok) => {
+                              if (ok) resolve(report.id, "action_taken");
+                            })
+                          }
                         >
                           Ban user
                         </button>

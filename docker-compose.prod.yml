@@ -1,0 +1,116 @@
+# Phase 6 Part 6 (CI/CD): production Compose file. Deliberately separate
+# from docker-compose.yml (dev), not an override layered on top of it --
+# dev and prod differ in enough ways (no source-code volume mounts, no
+# --host dev servers, real images instead of bind-mounted `npm run dev`,
+# monitoring always on) that a shared base + override would end up mostly
+# `docker-compose.prod.yml`-only sections anyway. See
+# docs/phase-6-part8-deployment-*.md for how each service is actually
+# meant to be hosted -- this file is one valid way to run everything on a
+# single Docker host; Part 8 also documents running Postgres and the
+# frontend as managed services instead.
+#
+# Usage:
+#   cp .env.production.example .env.production   # fill in real secrets
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#
+# Images: defaults to building from source (the `build:` blocks below).
+# To instead deploy images already built and pushed by CI (see
+# .github/workflows/build-and-push.yml), set BACKEND_IMAGE/FRONTEND_IMAGE
+# and run `docker compose -f docker-compose.prod.yml pull && ... up -d`
+# -- Compose uses `image:` directly when it's already present/pullable and
+# only falls back to `build:` when it isn't.
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rentit_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # No published port by default -- only `backend` needs to reach this,
+    # over the internal Compose network. Uncomment only for a one-off
+    # debugging session, never left open in a real deployment.
+    # ports:
+    #   - "5432:5432"
+
+  backend:
+    image: ${BACKEND_IMAGE:-rentit-backend:prod}
+    build:
+      context: ./backend
+      target: prod
+    container_name: rentit_backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+    # No source volume mounts (unlike docker-compose.yml) -- the image
+    # built by the `prod` stage already contains the compiled dist/, this
+    # is the whole point of a production image being immutable.
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-rentit-frontend:prod}
+    build:
+      context: ./frontend
+      target: prod
+      args:
+        # Vite bakes VITE_* vars into the static bundle at BUILD time, not
+        # read at container start -- this must be passed as a build arg,
+        # setting it only in `environment:` below would silently do
+        # nothing. See docs/phase-6-part8-deployment-frontend.md.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    container_name: rentit_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: rentit_prometheus
+    restart: always
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: rentit_grafana
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:

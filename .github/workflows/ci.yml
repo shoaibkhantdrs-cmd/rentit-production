@@ -1,0 +1,179 @@
+name: CI
+
+# Phase 6 Part 6 (CI/CD). Runs on every push and PR so a broken build/lint/
+# test never reaches main un-noticed. The final job (build-and-push) only
+# runs after both test jobs pass, and only for pushes to main or a version
+# tag -- PRs get full verification but never publish an image, on purpose.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same branch/PR -- no point finishing a CI
+# run for a commit that's already been replaced by a newer push.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  backend:
+    name: Backend (lint, typecheck, migrations, tests)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: rentit_ci
+          POSTGRES_PASSWORD: rentit_ci_password
+          POSTGRES_DB: rentit_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rentit_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://rentit_ci:rentit_ci_password@localhost:5432/rentit_ci
+      JWT_ACCESS_SECRET: ci-test-secret-not-used-in-production
+      NODE_ENV: test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # NOTE: no `cache: npm` here on purpose. That option requires a
+          # committed package-lock.json to key the cache off of, and this
+          # repo doesn't have one yet -- generated in a sandbox with no
+          # npm registry access (see docs/phase-6-part6-cicd.md "Known gap:
+          # no committed lockfiles"). Using `npm install` instead of
+          # `npm ci` below for the same reason. Once someone runs a real
+          # `npm install` locally and commits the resulting lockfile,
+          # switch this back to `npm ci` + `cache: npm` for faster,
+          # fully-reproducible builds -- npm ci is the correct long-term
+          # choice, this is a stopgap.
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Real migrations against a real (throwaway, CI-only) Postgres --
+      # catches a migration that's broken/out-of-order before it ever
+      # reaches a real environment. This is the one step in this job that
+      # touches the `postgres` service above; the test suite itself (next
+      # step) runs entirely against in-memory fakes (see
+      # tests/support/buildTestContainer.ts) and does not need a DB.
+      - name: Run migrations against a throwaway Postgres
+        run: npm run migrate:up
+
+      - name: Unit + integration + e2e tests
+        run: npm test
+
+      - name: Build (compile TypeScript)
+        run: npm run build
+
+  frontend:
+    name: Frontend (lint, typecheck, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # See the matching note in the backend job above -- no lockfile
+          # committed yet, so no cache key and `npm install` not `npm ci`.
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        env:
+          # A placeholder is fine here -- this build step only proves the
+          # frontend compiles; the real value is baked in at deploy time
+          # by docker-compose.prod.yml's build.args (see
+          # docs/phase-6-part8-deployment-frontend.md).
+          VITE_API_BASE_URL: https://api.example.com
+        run: npm run build
+
+  build-and-push:
+    name: Build & push production images
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          SHA_TAG="sha-${GITHUB_SHA::7}"
+          echo "sha_tag=$SHA_TAG" >> "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version_tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version_tag=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build & push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          target: prod
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/rentit-backend:${{ steps.tags.outputs.sha_tag }}
+            ${{ github.ref == 'refs/heads/main' && format('ghcr.io/{0}/rentit-backend:latest', github.repository_owner) || '' }}
+            ${{ steps.tags.outputs.version_tag != '' && format('ghcr.io/{0}/rentit-backend:{1}', github.repository_owner, steps.tags.outputs.version_tag) || '' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          target: prod
+          push: true
+          build-args: |
+            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/rentit-frontend:${{ steps.tags.outputs.sha_tag }}
+            ${{ github.ref == 'refs/heads/main' && format('ghcr.io/{0}/rentit-frontend:latest', github.repository_owner) || '' }}
+            ${{ steps.tags.outputs.version_tag != '' && format('ghcr.io/{0}/rentit-frontend:{1}', github.repository_owner, steps.tags.outputs.version_tag) || '' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

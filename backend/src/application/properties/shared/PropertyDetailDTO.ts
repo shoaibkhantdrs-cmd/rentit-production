@@ -1,6 +1,4 @@
 import { Property } from "@/domain/entities/Property";
-import { PropertyLocation } from "@/domain/entities/PropertyLocation";
-import { PropertyImage } from "@/domain/entities/PropertyImage";
 
 export interface PropertyDetailDTO {
   id: string;

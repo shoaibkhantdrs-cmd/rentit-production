@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { env } from "@/config/env";
 import { tokenStore } from "@/api/tokenStore";
 import { ChatRealtimeEvent } from "@/api/types";
@@ -86,11 +86,16 @@ export function useChatSocket(onEvent: (event: ChatRealtimeEvent) => void) {
     };
   }, []);
 
-  function send(payload: unknown) {
+  // Perf fix: this was a plain function, recreated fresh on every render --
+  // it only ever reads socketRef (a stable ref), so it never actually
+  // needed to change. useCallback with an empty dep array gives ChatContext
+  // a reference-stable `send` it can safely include in its own memoized
+  // value below.
+  const send = useCallback((payload: unknown) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(payload));
     }
-  }
+  }, []);
 
   return { send };
 }

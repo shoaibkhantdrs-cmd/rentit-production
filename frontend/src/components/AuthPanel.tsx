@@ -89,7 +89,7 @@ export function AuthPanel({ message }: { message?: string }) {
               placeholder="you@example.com"
             />
           </div>
-          <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
+          <button type="submit" className="btn-v2 btn-v2--primary" style={{ width: "100%" }} disabled={submitting}>
             {submitting ? "Sending code..." : "Send login code"}
           </button>
           <p style={{ textAlign: "center", marginTop: 14 }}>
@@ -117,7 +117,7 @@ export function AuthPanel({ message }: { message?: string }) {
               placeholder="123456"
             />
           </div>
-          <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
+          <button type="submit" className="btn-v2 btn-v2--primary" style={{ width: "100%" }} disabled={submitting}>
             {submitting ? "Verifying..." : "Verify and sign in"}
           </button>
           <p style={{ textAlign: "center", marginTop: 14 }}>
@@ -144,7 +144,7 @@ export function AuthPanel({ message }: { message?: string }) {
               onChange={(e) => setIdentifier(e.target.value)}
             />
           </div>
-          <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
+          <button type="submit" className="btn-v2 btn-v2--primary" style={{ width: "100%" }} disabled={submitting}>
             {submitting ? "Creating account..." : "Create account"}
           </button>
           <p style={{ textAlign: "center", marginTop: 14 }}>

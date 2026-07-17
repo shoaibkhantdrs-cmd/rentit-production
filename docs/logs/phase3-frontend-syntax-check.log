@@ -1,0 +1,5 @@
+=== Phase 3: syntax check (frontend) ===
+CRASH in src/vite-env.d.ts: Debug Failure. Output generation failed
+
+Checked 63 files, 1 syntax errors.
+EXIT=0

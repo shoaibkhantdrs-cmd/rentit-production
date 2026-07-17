@@ -16,6 +16,13 @@ export interface IPropertyImageRepository {
   create(input: NewPropertyImageInput): Promise<PropertyImage>;
   findById(id: string): Promise<PropertyImage | null>;
   listForProperty(propertyId: string): Promise<PropertyImage[]>;
+  /**
+   * Every (non-deleted) image for a batch of properties in one query,
+   * ordered the same way listForProperty orders a single property's images
+   * (sort_order). Additive -- lets PropertyDetailLoader.loadMany batch the
+   * full image set for a page of properties instead of one query per row.
+   */
+  listForProperties(propertyIds: string[]): Promise<PropertyImage[]>;
   /** One (the primary, or otherwise lowest sort_order) image per property -- for list/search thumbnails. */
   listPrimaryForProperties(propertyIds: string[]): Promise<PropertyImage[]>;
   countForProperty(propertyId: string): Promise<number>;

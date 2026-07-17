@@ -34,18 +34,26 @@ export class NotifySavedSearchesForPropertyUseCase {
     ]);
 
     const matches = notifiable.filter((search) => matchesSavedSearch(property, location, search.filters));
+    if (matches.length === 0) return;
+
     const now = this.clock.now();
+
+    // Perf fix: was one awaited INSERT per match inside the loop below;
+    // now a single bulk insert for the in-app notification rows (reuses
+    // the same createMany() added for BroadcastNotification). Content per
+    // recipient is unchanged.
+    await this.notificationRepo.createMany(
+      matches.map((search) => ({
+        userId: search.userId,
+        type: "saved_search.match",
+        title: `New match for "${search.name}"`,
+        body: property.title,
+        data: { savedSearchId: search.id, propertyId: property.id },
+      })),
+    );
 
     await Promise.all(
       matches.map(async (search) => {
-        await this.notificationRepo.create({
-          userId: search.userId,
-          type: "saved_search.match",
-          title: `New match for "${search.name}"`,
-          body: property.title,
-          data: { savedSearchId: search.id, propertyId: property.id },
-        });
-
         const wantsPush = await isCategoryEnabled(this.userPreferenceRepo, search.userId, "newProperties");
         if (wantsPush) {
           await this.pushService.send({

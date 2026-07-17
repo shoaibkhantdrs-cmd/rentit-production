@@ -1,0 +1,1026 @@
+=== Phase 5: full backend test suite ===
+TAP version 13
+# Subtest: End-to-end: a saved search fires, then the seeker views, chats, and WhatsApps the owner
+ok 1 - End-to-end: a saved search fires, then the seeker views, chats, and WhatsApps the owner
+  ---
+  duration_ms: 1.878875
+  type: 'test'
+  ...
+# Subtest: BroadcastNotificationUseCase: creates one notification per active recipient and pushes via the push service
+ok 2 - BroadcastNotificationUseCase: creates one notification per active recipient and pushes via the push service
+  ---
+  duration_ms: 1.427875
+  type: 'test'
+  ...
+# Subtest: BroadcastNotificationUseCase: scopes to a role when specified
+ok 3 - BroadcastNotificationUseCase: scopes to a role when specified
+  ---
+  duration_ms: 0.185708
+  type: 'test'
+  ...
+# Subtest: GetDashboardStatsUseCase: aggregates counts across users, properties, reports, verifications
+ok 4 - GetDashboardStatsUseCase: aggregates counts across users, properties, reports, verifications
+  ---
+  duration_ms: 0.260792
+  type: 'test'
+  ...
+# Subtest: GetGrowthAnalyticsUseCase: validates days range and zero-fills days with no activity
+ok 5 - GetGrowthAnalyticsUseCase: validates days range and zero-fills days with no activity
+  ---
+  duration_ms: 0.302167
+  type: 'test'
+  ...
+# Subtest: GetTopPropertiesUseCase: validates limit and sorts by the requested metric
+ok 6 - GetTopPropertiesUseCase: validates limit and sorts by the requested metric
+  ---
+  duration_ms: 0.226083
+  type: 'test'
+  ...
+# Subtest: SearchAuditLogsUseCase: filters by action and paginates
+ok 7 - SearchAuditLogsUseCase: filters by action and paginates
+  ---
+  duration_ms: 0.120167
+  type: 'test'
+  ...
+# Subtest: GetSystemHealthUseCase: reports ok when the database is healthy, degraded when not
+ok 8 - GetSystemHealthUseCase: reports ok when the database is healthy, degraded when not
+  ---
+  duration_ms: 0.128583
+  type: 'test'
+  ...
+# Subtest: ApprovePropertyUseCase: publishes a pending property, records history, notifies owner
+ok 9 - ApprovePropertyUseCase: publishes a pending property, records history, notifies owner
+  ---
+  duration_ms: 1.506958
+  type: 'test'
+  ...
+# Subtest: RejectPropertyUseCase: requires a reason, sets rejection_reason and status
+ok 10 - RejectPropertyUseCase: requires a reason, sets rejection_reason and status
+  ---
+  duration_ms: 0.263
+  type: 'test'
+  ...
+# Subtest: HideProperty/UnhideProperty: hides a published listing then restores it
+ok 11 - HideProperty/UnhideProperty: hides a published listing then restores it
+  ---
+  duration_ms: 0.227708
+  type: 'test'
+  ...
+# Subtest: Feature/UnfeatureProperty: only published listings can be featured
+ok 12 - Feature/UnfeatureProperty: only published listings can be featured
+  ---
+  duration_ms: 0.167792
+  type: 'test'
+  ...
+# Subtest: AdminSearchPropertiesUseCase: filters by status and isFeatured, sorts most_favorited
+ok 13 - AdminSearchPropertiesUseCase: filters by status and isFeatured, sorts most_favorited
+  ---
+  duration_ms: 0.182042
+  type: 'test'
+  ...
+# Subtest: BulkModeratePropertiesUseCase: applies action to many properties, tolerates partial failure
+ok 14 - BulkModeratePropertiesUseCase: applies action to many properties, tolerates partial failure
+  ---
+  duration_ms: 0.341459
+  type: 'test'
+  ...
+# Subtest: GetPropertyModerationHistoryUseCase: per-property and admin-wide feeds
+ok 15 - GetPropertyModerationHistoryUseCase: per-property and admin-wide feeds
+  ---
+  duration_ms: 0.195708
+  type: 'test'
+  ...
+# Subtest: ReportUserUseCase: reports a user, rejects self-report and duplicate report
+ok 16 - ReportUserUseCase: reports a user, rejects self-report and duplicate report
+  ---
+  duration_ms: 1.277334
+  type: 'test'
+  ...
+# Subtest: ListUserReportsUseCase / UpdateUserReportStatusUseCase: resolve and dismiss reports
+ok 17 - ListUserReportsUseCase / UpdateUserReportStatusUseCase: resolve and dismiss reports
+  ---
+  duration_ms: 0.25575
+  type: 'test'
+  ...
+# Subtest: ListPropertyReportsUseCase / UpdatePropertyReportStatusUseCase: dismiss a property report
+ok 18 - ListPropertyReportsUseCase / UpdatePropertyReportStatusUseCase: dismiss a property report
+  ---
+  duration_ms: 0.243459
+  type: 'test'
+  ...
+# Subtest: Identity verification: submit, list pending, approve sets identityVerifiedAt
+ok 19 - Identity verification: submit, list pending, approve sets identityVerifiedAt
+  ---
+  duration_ms: 0.289166
+  type: 'test'
+  ...
+# Subtest: Identity verification: rejection requires a reason and allows resubmission
+ok 20 - Identity verification: rejection requires a reason and allows resubmission
+  ---
+  duration_ms: 0.226625
+  type: 'test'
+  ...
+# Subtest: SearchUsersUseCase: filters by query, status, and role
+ok 21 - SearchUsersUseCase: filters by query, status, and role
+  ---
+  duration_ms: 1.262834
+  type: 'test'
+  ...
+# Subtest: GetUserProfileUseCase: 404s for unknown user, returns roles/preferences/activity/propertyCount
+ok 22 - GetUserProfileUseCase: 404s for unknown user, returns roles/preferences/activity/propertyCount
+  ---
+  duration_ms: 0.547792
+  type: 'test'
+  ...
+# Subtest: UpdateUserStatusUseCase: suspends a user, revokes sessions, and is audit-logged
+ok 23 - UpdateUserStatusUseCase: suspends a user, revokes sessions, and is audit-logged
+  ---
+  duration_ms: 0.200916
+  type: 'test'
+  ...
+# Subtest: UpdateUserStatusUseCase: a user cannot suspend/ban themselves, but can 'activate' (no-op safety)
+ok 24 - UpdateUserStatusUseCase: a user cannot suspend/ban themselves, but can 'activate' (no-op safety)
+  ---
+  duration_ms: 0.316583
+  type: 'test'
+  ...
+# Subtest: UpdateUserStatusUseCase: a plain admin cannot moderate a super_admin
+ok 25 - UpdateUserStatusUseCase: a plain admin cannot moderate a super_admin
+  ---
+  duration_ms: 0.214167
+  type: 'test'
+  ...
+# Subtest: AdminDeleteUserUseCase: soft-deletes a user and revokes sessions; cannot delete self
+ok 26 - AdminDeleteUserUseCase: soft-deletes a user and revokes sessions; cannot delete self
+  ---
+  duration_ms: 0.238
+  type: 'test'
+  ...
+# Subtest: AdminResetUserPasswordUseCase: triggers a password_reset OTP without exposing a plaintext password
+ok 27 - AdminResetUserPasswordUseCase: triggers a password_reset OTP without exposing a plaintext password
+  ---
+  duration_ms: 0.747
+  type: 'test'
+  ...
+# Subtest: UpdateUserRolesUseCase: reconciles roles (adds and removes), only super_admin can grant super_admin
+ok 28 - UpdateUserRolesUseCase: reconciles roles (adds and removes), only super_admin can grant super_admin
+  ---
+  duration_ms: 0.8415
+  type: 'test'
+  ...
+# Subtest: GetUserActivityUseCase: paginates a user's activity log, 404s for unknown user
+ok 29 - GetUserActivityUseCase: paginates a user's activity log, 404s for unknown user
+  ---
+  duration_ms: 1.231
+  type: 'test'
+  ...
+# Subtest: register creates an account, assigns default role, and sends verification codes
+ok 30 - register creates an account, assigns default role, and sends verification codes
+  ---
+  duration_ms: 1.642792
+  type: 'test'
+  ...
+# Subtest: registering the same email twice is rejected with a conflict
+ok 31 - registering the same email twice is rejected with a conflict
+  ---
+  duration_ms: 0.336
+  type: 'test'
+  ...
+# Subtest: verify-otp confirms email verification with the correct code
+ok 32 - verify-otp confirms email verification with the correct code
+  ---
+  duration_ms: 1.28025
+  type: 'test'
+  ...
+# Subtest: verify-otp rejects an incorrect code and tracks attempts
+ok 33 - verify-otp rejects an incorrect code and tracks attempts
+  ---
+  duration_ms: 0.301375
+  type: 'test'
+  ...
+# Subtest: login without a password issues an OTP instead of tokens
+ok 34 - login without a password issues an OTP instead of tokens
+  ---
+  duration_ms: 0.319166
+  type: 'test'
+  ...
+# Subtest: login for an unknown identifier behaves identically to otp_required (no enumeration)
+ok 35 - login for an unknown identifier behaves identically to otp_required (no enumeration)
+  ---
+  duration_ms: 0.073834
+  type: 'test'
+  ...
+# Subtest: verify-otp with purpose=login authenticates and issues tokens
+ok 36 - verify-otp with purpose=login authenticates and issues tokens
+  ---
+  duration_ms: 0.41025
+  type: 'test'
+  ...
+# Subtest: StartConversationUseCase: creates a conversation and is idempotent
+ok 37 - StartConversationUseCase: creates a conversation and is idempotent
+  ---
+  duration_ms: 1.038625
+  type: 'test'
+  ...
+# Subtest: StartConversationUseCase: rejects messaging yourself and nonexistent users
+ok 38 - StartConversationUseCase: rejects messaging yourself and nonexistent users
+  ---
+  duration_ms: 0.474125
+  type: 'test'
+  ...
+# Subtest: SendMessageUseCase: delivers text, records preview, notifies, and pushes over the realtime gateway
+ok 39 - SendMessageUseCase: delivers text, records preview, notifies, and pushes over the realtime gateway
+  ---
+  duration_ms: 0.773958
+  type: 'test'
+  ...
+# Subtest: SendMessageUseCase: an image-only message is valid, a completely empty one is not
+ok 40 - SendMessageUseCase: an image-only message is valid, a completely empty one is not
+  ---
+  duration_ms: 0.34825
+  type: 'test'
+  ...
+# Subtest: SendMessageUseCase: only participants may post into a conversation
+ok 41 - SendMessageUseCase: only participants may post into a conversation
+  ---
+  duration_ms: 0.190334
+  type: 'test'
+  ...
+# Subtest: Unread counts and read receipts move correctly as messages are sent and read
+ok 42 - Unread counts and read receipts move correctly as messages are sent and read
+  ---
+  duration_ms: 0.884166
+  type: 'test'
+  ...
+# Subtest: DeleteMessageUseCase: soft-deletes for the sender only, hides content, broadcasts the deletion
+ok 43 - DeleteMessageUseCase: soft-deletes for the sender only, hides content, broadcasts the deletion
+  ---
+  duration_ms: 0.555542
+  type: 'test'
+  ...
+# Subtest: SendTypingIndicatorUseCase: broadcasts to the other participant only, and rejects non-participants
+ok 44 - SendTypingIndicatorUseCase: broadcasts to the other participant only, and rejects non-participants
+  ---
+  duration_ms: 0.276041
+  type: 'test'
+  ...
+# Subtest: Conversations can be scoped to a property
+ok 45 - Conversations can be scoped to a property
+  ---
+  duration_ms: 0.89625
+  type: 'test'
+  ...
+# Subtest: RegisterUserUseCase: sends a welcome email in addition to the OTP emails
+ok 46 - RegisterUserUseCase: sends a welcome email in addition to the OTP emails
+  ---
+  duration_ms: 1.424292
+  type: 'test'
+  ...
+# Subtest: ApprovePropertyUseCase: emails the owner and triggers the saved-search notification sweep
+ok 47 - ApprovePropertyUseCase: emails the owner and triggers the saved-search notification sweep
+  ---
+  duration_ms: 0.919417
+  type: 'test'
+  ...
+# Subtest: GetNotificationPreferencesUseCase: defaults everything to on for a brand-new user
+ok 48 - GetNotificationPreferencesUseCase: defaults everything to on for a brand-new user
+  ---
+  duration_ms: 1.309167
+  type: 'test'
+  ...
+# Subtest: UpdateNotificationPreferencesUseCase: partial updates merge instead of clobbering
+ok 49 - UpdateNotificationPreferencesUseCase: partial updates merge instead of clobbering
+  ---
+  duration_ms: 0.178209
+  type: 'test'
+  ...
+# Subtest: Disabling newMessages stops push notifications for chat but not the in-app record
+ok 50 - Disabling newMessages stops push notifications for chat but not the in-app record
+  ---
+  duration_ms: 0.353792
+  type: 'test'
+  ...
+# Subtest: RegisterPushTokenUseCase: registers, and clearing with null removes it from delivery targets
+ok 51 - RegisterPushTokenUseCase: registers, and clearing with null removes it from delivery targets
+  ---
+  duration_ms: 0.166833
+  type: 'test'
+  ...
+# Subtest: OTP verification is locked out after max attempts
+ok 52 - OTP verification is locked out after max attempts
+  ---
+  duration_ms: 1.895625
+  type: 'test'
+  ...
+# Subtest: verify-otp rejects purpose=password_reset (must go through reset-password instead)
+ok 53 - verify-otp rejects purpose=password_reset (must go through reset-password instead)
+  ---
+  duration_ms: 0.310083
+  type: 'test'
+  ...
+# Subtest: an expired OTP is rejected even with the correct code
+ok 54 - an expired OTP is rejected even with the correct code
+  ---
+  duration_ms: 0.720125
+  type: 'test'
+  ...
+# Subtest: registering without a phone succeeds and skips the phone_verification OTP
+ok 55 - registering without a phone succeeds and skips the phone_verification OTP
+  ---
+  duration_ms: 0.189042
+  type: 'test'
+  ...
+# Subtest: register with a password, then log in with that password directly (no OTP)
+ok 56 - register with a password, then log in with that password directly (no OTP)
+  ---
+  duration_ms: 2.561167
+  type: 'test'
+  ...
+# Subtest: wrong password is rejected and audit-logged
+ok 57 - wrong password is rejected and audit-logged
+  ---
+  duration_ms: 0.886834
+  type: 'test'
+  ...
+# Subtest: forgot-password never reveals whether the email exists
+ok 58 - forgot-password never reveals whether the email exists
+  ---
+  duration_ms: 0.236333
+  type: 'test'
+  ...
+# Subtest: reset-password with a valid code changes the password and revokes existing sessions
+ok 59 - reset-password with a valid code changes the password and revokes existing sessions
+  ---
+  duration_ms: 0.6235
+  type: 'test'
+  ...
+# Subtest: reset-password rejects an incorrect code without revealing account existence
+ok 60 - reset-password rejects an incorrect code without revealing account existence
+  ---
+  duration_ms: 0.261417
+  type: 'test'
+  ...
+# Subtest: CreatePropertyUseCase: creates a property with location, features, and status history
+ok 61 - CreatePropertyUseCase: creates a property with location, features, and status history
+  ---
+  duration_ms: 1.494625
+  type: 'test'
+  ...
+# Subtest: CreatePropertyUseCase: geocodes the address when lat/lng are not supplied
+ok 62 - CreatePropertyUseCase: geocodes the address when lat/lng are not supplied
+  ---
+  duration_ms: 0.20875
+  type: 'test'
+  ...
+# Subtest: CreatePropertyUseCase: throws NotFoundError for an unknown category
+ok 63 - CreatePropertyUseCase: throws NotFoundError for an unknown category
+  ---
+  duration_ms: 0.209584
+  type: 'test'
+  ...
+# Subtest: GetPropertyUseCase: 404s for a stranger viewing an unpublished listing, but owner can see it
+ok 64 - GetPropertyUseCase: 404s for a stranger viewing an unpublished listing, but owner can see it
+  ---
+  duration_ms: 0.247042
+  type: 'test'
+  ...
+# Subtest: GetPropertyUseCase: increments view count once per viewer within the dedup window
+ok 65 - GetPropertyUseCase: increments view count once per viewer within the dedup window
+  ---
+  duration_ms: 0.976292
+  type: 'test'
+  ...
+# Subtest: UpdatePropertyUseCase: owner can update fields, records status history on status change
+ok 66 - UpdatePropertyUseCase: owner can update fields, records status history on status change
+  ---
+  duration_ms: 0.19875
+  type: 'test'
+  ...
+# Subtest: UpdatePropertyUseCase: re-geocodes only when address changes without explicit coordinates
+ok 67 - UpdatePropertyUseCase: re-geocodes only when address changes without explicit coordinates
+  ---
+  duration_ms: 0.209459
+  type: 'test'
+  ...
+# Subtest: UpdatePropertyUseCase: a stranger cannot update someone else's property
+ok 68 - UpdatePropertyUseCase: a stranger cannot update someone else's property
+  ---
+  duration_ms: 0.146708
+  type: 'test'
+  ...
+# Subtest: UpdatePropertyUseCase: an admin can update a property they do not own
+ok 69 - UpdatePropertyUseCase: an admin can update a property they do not own
+  ---
+  duration_ms: 0.490875
+  type: 'test'
+  ...
+# Subtest: DeletePropertyUseCase: soft-deletes and records a 'removed' status history entry
+ok 70 - DeletePropertyUseCase: soft-deletes and records a 'removed' status history entry
+  ---
+  duration_ms: 0.38875
+  type: 'test'
+  ...
+# Subtest: UploadPropertyImagesUseCase: first uploaded image becomes primary
+ok 71 - UploadPropertyImagesUseCase: first uploaded image becomes primary
+  ---
+  duration_ms: 1.11925
+  type: 'test'
+  ...
+# Subtest: UploadPropertyImagesUseCase: rejects uploads that would exceed the 10-image maximum
+ok 72 - UploadPropertyImagesUseCase: rejects uploads that would exceed the 10-image maximum
+  ---
+  duration_ms: 0.611834
+  type: 'test'
+  ...
+# Subtest: UploadPropertyImagesUseCase: rejects empty upload and non-owner uploads
+ok 73 - UploadPropertyImagesUseCase: rejects empty upload and non-owner uploads
+  ---
+  duration_ms: 0.578791
+  type: 'test'
+  ...
+# Subtest: DeletePropertyImageUseCase: auto-promotes the next image when the primary is deleted
+ok 74 - DeletePropertyImageUseCase: auto-promotes the next image when the primary is deleted
+  ---
+  duration_ms: 0.392708
+  type: 'test'
+  ...
+# Subtest: DeletePropertyImageUseCase: 404s for an image that doesn't belong to the property
+ok 75 - DeletePropertyImageUseCase: 404s for an image that doesn't belong to the property
+  ---
+  duration_ms: 0.296333
+  type: 'test'
+  ...
+# Subtest: FavoriteProperty / UnfavoriteProperty: idempotent and maintains a denormalized favorite count
+ok 76 - FavoriteProperty / UnfavoriteProperty: idempotent and maintains a denormalized favorite count
+  ---
+  duration_ms: 1.30675
+  type: 'test'
+  ...
+# Subtest: ReportProperty: one report per user per property, duplicate raises ConflictError
+ok 77 - ReportProperty: one report per user per property, duplicate raises ConflictError
+  ---
+  duration_ms: 0.287958
+  type: 'test'
+  ...
+# Subtest: GetMyProperties / GetMyFavorites: return only the requesting user's data, paginated
+ok 78 - GetMyProperties / GetMyFavorites: return only the requesting user's data, paginated
+  ---
+  duration_ms: 0.576584
+  type: 'test'
+  ...
+# Subtest: SearchPropertiesUseCase: excludes unpublished and soft-deleted listings
+ok 79 - SearchPropertiesUseCase: excludes unpublished and soft-deleted listings
+  ---
+  duration_ms: 2.213958
+  type: 'test'
+  ...
+# Subtest: SearchPropertiesUseCase: filters by bedrooms, rent range, and furnished status
+ok 80 - SearchPropertiesUseCase: filters by bedrooms, rent range, and furnished status
+  ---
+  duration_ms: 0.7275
+  type: 'test'
+  ...
+# Subtest: SearchPropertiesUseCase: city filter is a case-insensitive substring match
+ok 81 - SearchPropertiesUseCase: city filter is a case-insensitive substring match
+  ---
+  duration_ms: 0.376291
+  type: 'test'
+  ...
+# Subtest: SearchPropertiesUseCase: unknown category slug returns an empty result, not an error
+ok 82 - SearchPropertiesUseCase: unknown category slug returns an empty result, not an error
+  ---
+  duration_ms: 0.855917
+  type: 'test'
+  ...
+# Subtest: SearchPropertiesUseCase: each sort option orders results correctly
+ok 83 - SearchPropertiesUseCase: each sort option orders results correctly
+  ---
+  duration_ms: 0.931833
+  type: 'test'
+  ...
+# Subtest: SearchPropertiesUseCase: pagination slices results and reports total independent of page size
+ok 84 - SearchPropertiesUseCase: pagination slices results and reports total independent of page size
+  ---
+  duration_ms: 1.060916
+  type: 'test'
+  ...
+# Subtest: SearchPropertiesUseCase: radius search only returns listings within the given distance
+ok 85 - SearchPropertiesUseCase: radius search only returns listings within the given distance
+  ---
+  duration_ms: 0.371166
+  type: 'test'
+  ...
+# Subtest: SearchPropertiesUseCase: search results include category name and primary image
+ok 86 - SearchPropertiesUseCase: search results include category name and primary image
+  ---
+  duration_ms: 0.348
+  type: 'test'
+  ...
+# Subtest: GetRecentlyViewedUseCase: newest-first, deduplicated, and excludes unpublished properties
+ok 87 - GetRecentlyViewedUseCase: newest-first, deduplicated, and excludes unpublished properties
+  ---
+  duration_ms: 1.478625
+  type: 'test'
+  ...
+# Subtest: GetRecommendationsUseCase (by property): same category, similar price band, excludes the seed itself
+ok 88 - GetRecommendationsUseCase (by property): same category, similar price band, excludes the seed itself
+  ---
+  duration_ms: 0.514625
+  type: 'test'
+  ...
+# Subtest: GetRecommendationsUseCase (for a user): derives category/price from their favorites
+ok 89 - GetRecommendationsUseCase (for a user): derives category/price from their favorites
+  ---
+  duration_ms: 0.346166
+  type: 'test'
+  ...
+# Subtest: refresh rotates the token: old token stops working, new one works
+ok 90 - refresh rotates the token: old token stops working, new one works
+  ---
+  duration_ms: 2.655083
+  type: 'test'
+  ...
+# Subtest: replaying an already-rotated refresh token revokes the whole family (reuse detection)
+ok 91 - replaying an already-rotated refresh token revokes the whole family (reuse detection)
+  ---
+  duration_ms: 0.463292
+  type: 'test'
+  ...
+# Subtest: an expired refresh token is rejected
+ok 92 - an expired refresh token is rejected
+  ---
+  duration_ms: 0.184666
+  type: 'test'
+  ...
+# Subtest: logout revokes the session; the refresh token can no longer be used
+ok 93 - logout revokes the session; the refresh token can no longer be used
+  ---
+  duration_ms: 0.252041
+  type: 'test'
+  ...
+# Subtest: logout is idempotent -- calling it twice does not throw
+ok 94 - logout is idempotent -- calling it twice does not throw
+  ---
+  duration_ms: 0.214208
+  type: 'test'
+  ...
+# Subtest: logout-all revokes every session/refresh token for the user across devices
+ok 95 - logout-all revokes every session/refresh token for the user across devices
+  ---
+  duration_ms: 0.611625
+  type: 'test'
+  ...
+# Subtest: CreateSavedSearchUseCase: requires a name and persists the filters as given
+ok 96 - CreateSavedSearchUseCase: requires a name and persists the filters as given
+  ---
+  duration_ms: 1.252708
+  type: 'test'
+  ...
+# Subtest: UpdateSavedSearchUseCase/DeleteSavedSearchUseCase: only the owner may modify their saved search
+ok 97 - UpdateSavedSearchUseCase/DeleteSavedSearchUseCase: only the owner may modify their saved search
+  ---
+  duration_ms: 0.286167
+  type: 'test'
+  ...
+# Subtest: NotifySavedSearchesForPropertyUseCase: notifies matching searches, skips non-matches, respects push preference
+ok 98 - NotifySavedSearchesForPropertyUseCase: notifies matching searches, skips non-matches, respects push preference
+  ---
+  duration_ms: 0.445417
+  type: 'test'
+  ...
+# Subtest: getMe returns the public profile, roles, and default preferences
+ok 99 - getMe returns the public profile, roles, and default preferences
+  ---
+  duration_ms: 1.668875
+  type: 'test'
+  ...
+# Subtest: getMe throws NotFoundError for a soft-deleted user
+ok 100 - getMe throws NotFoundError for a soft-deleted user
+  ---
+  duration_ms: 0.427333
+  type: 'test'
+  ...
+# Subtest: updateMe changes the name and preferences, and logs activity
+ok 101 - updateMe changes the name and preferences, and logs activity
+  ---
+  duration_ms: 0.682875
+  type: 'test'
+  ...
+# Subtest: updateMe changing phone resets phoneVerifiedAt and sends a new verification OTP
+ok 102 - updateMe changing phone resets phoneVerifiedAt and sends a new verification OTP
+  ---
+  duration_ms: 0.471333
+  type: 'test'
+  ...
+# Subtest: updateMe rejects a phone number already used by a different account
+ok 103 - updateMe rejects a phone number already used by a different account
+  ---
+  duration_ms: 0.404292
+  type: 'test'
+  ...
+# Subtest: deleteMe soft-deletes the account and revokes all sessions
+ok 104 - deleteMe soft-deletes the account and revokes all sessions
+  ---
+  duration_ms: 0.282292
+  type: 'test'
+  ...
+# Subtest: notifications: list, filter unread, and mark read
+ok 105 - notifications: list, filter unread, and mark read
+  ---
+  duration_ms: 0.322334
+  type: 'test'
+  ...
+# Subtest: notifications: pagination returns the correct page and total
+ok 106 - notifications: pagination returns the correct page and total
+  ---
+  duration_ms: 0.296792
+  type: 'test'
+  ...
+# Subtest: ContactOwnerUseCase: sends the contact_owner template to the owner's phone
+ok 107 - ContactOwnerUseCase: sends the contact_owner template to the owner's phone
+  ---
+  duration_ms: 1.151875
+  type: 'test'
+  ...
+# Subtest: ContactOwnerUseCase: fails clearly when the owner has no phone on file
+ok 108 - ContactOwnerUseCase: fails clearly when the owner has no phone on file
+  ---
+  duration_ms: 0.2865
+  type: 'test'
+  ...
+# Subtest: SendInquiryUseCase: carries the message text and enforces length/emptiness
+ok 109 - SendInquiryUseCase: carries the message text and enforces length/emptiness
+  ---
+  duration_ms: 0.173125
+  type: 'test'
+  ...
+# Subtest: SharePropertyUseCase: builds a listing URL and doesn't require the sender to be signed in
+ok 110 - SharePropertyUseCase: builds a listing URL and doesn't require the sender to be signed in
+  ---
+  duration_ms: 0.115416
+  type: 'test'
+  ...
+# Subtest: generates a code of exactly the requested length, zero-padded
+ok 111 - generates a code of exactly the requested length, zero-padded
+  ---
+  duration_ms: 0.612333
+  type: 'test'
+  ...
+# Subtest: supports different lengths
+ok 112 - supports different lengths
+  ---
+  duration_ms: 0.054584
+  type: 'test'
+  ...
+# Subtest: produces a reasonable spread of values (not a constant)
+ok 113 - produces a reasonable spread of values (not a constant)
+  ---
+  duration_ms: 0.08625
+  type: 'test'
+  ...
+# Subtest: signs and verifies a token round-trip
+ok 114 - signs and verifies a token round-trip
+  ---
+  duration_ms: 0.816209
+  type: 'test'
+  ...
+# Subtest: produces a real three-part base64url JWT
+ok 115 - produces a real three-part base64url JWT
+  ---
+  duration_ms: 0.115125
+  type: 'test'
+  ...
+# Subtest: rejects a token signed with a different secret
+ok 116 - rejects a token signed with a different secret
+  ---
+  duration_ms: 0.224958
+  type: 'test'
+  ...
+# Subtest: rejects a tampered payload even if the signature format is otherwise valid
+ok 117 - rejects a tampered payload even if the signature format is otherwise valid
+  ---
+  duration_ms: 0.092292
+  type: 'test'
+  ...
+# Subtest: rejects an expired token
+ok 118 - rejects an expired token
+  ---
+  duration_ms: 0.12225
+  type: 'test'
+  ...
+# Subtest: rejects a malformed token
+ok 119 - rejects a malformed token
+  ---
+  duration_ms: 0.048917
+  type: 'test'
+  ...
+# Subtest: rejects tokens from a different issuer or audience
+ok 120 - rejects tokens from a different issuer or audience
+  ---
+  duration_ms: 0.099
+  type: 'test'
+  ...
+# Subtest: generateOpaqueToken produces high-entropy, unique, hex tokens
+ok 121 - generateOpaqueToken produces high-entropy, unique, hex tokens
+  ---
+  duration_ms: 0.12075
+  type: 'test'
+  ...
+# Subtest: hashOpaqueToken is deterministic and secret-dependent
+ok 122 - hashOpaqueToken is deterministic and secret-dependent
+  ---
+  duration_ms: 0.134542
+  type: 'test'
+  ...
+# Subtest: verifyAndConsume succeeds with the correct code and marks it consumed
+ok 123 - verifyAndConsume succeeds with the correct code and marks it consumed
+  ---
+  duration_ms: 0.596583
+  type: 'test'
+  ...
+# Subtest: verifyAndConsume throws on a missing/already-consumed OTP
+ok 124 - verifyAndConsume throws on a missing/already-consumed OTP
+  ---
+  duration_ms: 0.206375
+  type: 'test'
+  ...
+# Subtest: a wrong code increments attempts but does not consume the OTP
+ok 125 - a wrong code increments attempts but does not consume the OTP
+  ---
+  duration_ms: 0.109958
+  type: 'test'
+  ...
+# Subtest: verifyAndConsume rejects once attempts reach maxAttempts, even with the right code
+ok 126 - verifyAndConsume rejects once attempts reach maxAttempts, even with the right code
+  ---
+  duration_ms: 0.08875
+  type: 'test'
+  ...
+# Subtest: verifyAndConsume rejects an expired code
+ok 127 - verifyAndConsume rejects an expired code
+  ---
+  duration_ms: 0.076291
+  type: 'test'
+  ...
+# Subtest: assertCanModerateUser: allows a plain admin to moderate a non-super_admin
+ok 128 - assertCanModerateUser: allows a plain admin to moderate a non-super_admin
+  ---
+  duration_ms: 0.317125
+  type: 'test'
+  ...
+# Subtest: assertCanModerateUser: blocks a plain admin from moderating a super_admin
+ok 129 - assertCanModerateUser: blocks a plain admin from moderating a super_admin
+  ---
+  duration_ms: 0.179208
+  type: 'test'
+  ...
+# Subtest: assertCanModerateUser: allows a super_admin to moderate another super_admin
+ok 130 - assertCanModerateUser: allows a super_admin to moderate another super_admin
+  ---
+  duration_ms: 0.039417
+  type: 'test'
+  ...
+# Subtest: calls next() with no error when the user has an allowed role
+ok 131 - calls next() with no error when the user has an allowed role
+  ---
+  duration_ms: 0.315584
+  type: 'test'
+  ...
+# Subtest: calls next(ForbiddenError) when the user lacks any allowed role
+ok 132 - calls next(ForbiddenError) when the user lacks any allowed role
+  ---
+  duration_ms: 0.082208
+  type: 'test'
+  ...
+# Subtest: calls next(UnauthorizedError) when there is no authenticated user at all
+ok 133 - calls next(UnauthorizedError) when there is no authenticated user at all
+  ---
+  duration_ms: 0.053125
+  type: 'test'
+  ...
+# Subtest: allows a user whose roles include just one of several allowed roles
+ok 134 - allows a user whose roles include just one of several allowed roles
+  ---
+  duration_ms: 0.040375
+  type: 'test'
+  ...
+# Subtest: buildPropertySearchQuery: no filters -- base conditions + pagination only
+ok 135 - buildPropertySearchQuery: no filters -- base conditions + pagination only
+  ---
+  duration_ms: 0.597125
+  type: 'test'
+  ...
+# Subtest: buildPropertySearchQuery: page 3 computes the correct offset
+ok 136 - buildPropertySearchQuery: page 3 computes the correct offset
+  ---
+  duration_ms: 0.061083
+  type: 'test'
+  ...
+# Subtest: buildPropertySearchQuery: each sort option maps to the right ORDER BY clause
+ok 137 - buildPropertySearchQuery: each sort option maps to the right ORDER BY clause
+  ---
+  duration_ms: 0.114083
+  type: 'test'
+  ...
+# Subtest: buildPropertySearchQuery: simple filters produce correctly indexed params
+ok 138 - buildPropertySearchQuery: simple filters produce correctly indexed params
+  ---
+  duration_ms: 0.064333
+  type: 'test'
+  ...
+# Subtest: buildPropertySearchQuery: complex filter combo + radius search indexes params correctly
+ok 139 - buildPropertySearchQuery: complex filter combo + radius search indexes params correctly
+  ---
+  duration_ms: 0.103792
+  type: 'test'
+  ...
+# Subtest: buildPropertySearchQuery: radius search omitted when only some of lat/lng/radius given
+ok 140 - buildPropertySearchQuery: radius search omitted when only some of lat/lng/radius given
+  ---
+  duration_ms: 0.115583
+  type: 'test'
+  ...
+# Subtest: haversineDistanceKm: same point is zero distance
+ok 141 - haversineDistanceKm: same point is zero distance
+  ---
+  duration_ms: 0.296458
+  type: 'test'
+  ...
+# Subtest: haversineDistanceKm: New York to Los Angeles is ~3936km
+ok 142 - haversineDistanceKm: New York to Los Angeles is ~3936km
+  ---
+  duration_ms: 0.069334
+  type: 'test'
+  ...
+# Subtest: haversineDistanceKm: London to Paris is ~344km
+ok 143 - haversineDistanceKm: London to Paris is ~344km
+  ---
+  duration_ms: 0.040333
+  type: 'test'
+  ...
+# Subtest: haversineDistanceKm: is symmetric
+ok 144 - haversineDistanceKm: is symmetric
+  ---
+  duration_ms: 0.038958
+  type: 'test'
+  ...
+# Subtest: boundingBox: contains the center point with margin
+ok 145 - boundingBox: contains the center point with margin
+  ---
+  duration_ms: 0.051542
+  type: 'test'
+  ...
+# Subtest: boundingBox: larger radius produces a wider box
+ok 146 - boundingBox: larger radius produces a wider box
+  ---
+  duration_ms: 0.037291
+  type: 'test'
+  ...
+# Subtest: boundingBox: a point within the radius falls inside the box
+ok 147 - boundingBox: a point within the radius falls inside the box
+  ---
+  duration_ms: 0.039583
+  type: 'test'
+  ...
+# Subtest: matchesSavedSearch: an empty filter set matches everything
+ok 148 - matchesSavedSearch: an empty filter set matches everything
+  ---
+  duration_ms: 0.421417
+  type: 'test'
+  ...
+# Subtest: matchesSavedSearch: categoryId must match exactly
+ok 149 - matchesSavedSearch: categoryId must match exactly
+  ---
+  duration_ms: 0.140208
+  type: 'test'
+  ...
+# Subtest: matchesSavedSearch: rent range is inclusive on both ends
+ok 150 - matchesSavedSearch: rent range is inclusive on both ends
+  ---
+  duration_ms: 0.166
+  type: 'test'
+  ...
+# Subtest: matchesSavedSearch: bedroomsMin/bathroomsMin/parkingMin/area are floor filters
+ok 151 - matchesSavedSearch: bedroomsMin/bathroomsMin/parkingMin/area are floor filters
+  ---
+  duration_ms: 0.170375
+  type: 'test'
+  ...
+# Subtest: matchesSavedSearch: city/locality comparisons are case-insensitive
+ok 152 - matchesSavedSearch: city/locality comparisons are case-insensitive
+  ---
+  duration_ms: 0.167
+  type: 'test'
+  ...
+# Subtest: matchesSavedSearch: without a location, city/locality/radius filters never match
+ok 153 - matchesSavedSearch: without a location, city/locality/radius filters never match
+  ---
+  duration_ms: 0.073875
+  type: 'test'
+  ...
+# Subtest: matchesSavedSearch: radius filter uses real distance, not just a bounding box
+ok 154 - matchesSavedSearch: radius filter uses real distance, not just a bounding box
+  ---
+  duration_ms: 0.155584
+  type: 'test'
+  ...
+# Subtest: matchesSavedSearch: availableFrom filter matches properties available on or before that date
+ok 155 - matchesSavedSearch: availableFrom filter matches properties available on or before that date
+  ---
+  duration_ms: 0.053458
+  type: 'test'
+  ...
+# Subtest: matchesSavedSearch: furnished status must match exactly when specified
+ok 156 - matchesSavedSearch: furnished status must match exactly when specified
+  ---
+  duration_ms: 0.146375
+  type: 'test'
+  ...
+# Subtest: trims leading/trailing whitespace from string fields
+ok 157 - trims leading/trailing whitespace from string fields
+  ---
+  duration_ms: 0.307959
+  type: 'test'
+  ...
+# Subtest: strips control characters embedded in a string
+ok 158 - strips control characters embedded in a string
+  ---
+  duration_ms: 0.064292
+  type: 'test'
+  ...
+# Subtest: recurses into nested objects and arrays
+ok 159 - recurses into nested objects and arrays
+  ---
+  duration_ms: 0.232833
+  type: 'test'
+  ...
+# Subtest: leaves non-string values (numbers, booleans, null) untouched
+ok 160 - leaves non-string values (numbers, booleans, null) untouched
+  ---
+  duration_ms: 0.082458
+  type: 'test'
+  ...
+# Subtest: calls next() exactly once
+ok 161 - calls next() exactly once
+  ---
+  duration_ms: 0.043417
+  type: 'test'
+  ...
+# Subtest: acceptKeyFor: matches the canonical RFC 6455 handshake example
+ok 162 - acceptKeyFor: matches the canonical RFC 6455 handshake example
+  ---
+  duration_ms: 0.363292
+  type: 'test'
+  ...
+# Subtest: encodeFrame/tryDecodeFrame: round-trips a masked client text frame
+ok 163 - encodeFrame/tryDecodeFrame: round-trips a masked client text frame
+  ---
+  duration_ms: 0.3675
+  type: 'test'
+  ...
+# Subtest: tryDecodeFrame: returns null (wait for more data) on a partial frame
+ok 164 - tryDecodeFrame: returns null (wait for more data) on a partial frame
+  ---
+  duration_ms: 0.060916
+  type: 'test'
+  ...
+# Subtest: tryDecodeFrame: rejects fragmented frames (FIN bit unset)
+ok 165 - tryDecodeFrame: rejects fragmented frames (FIN bit unset)
+  ---
+  duration_ms: 0.169292
+  type: 'test'
+  ...
+# Subtest: tryDecodeFrame: rejects frames over the size cap
+ok 166 - tryDecodeFrame: rejects frames over the size cap
+  ---
+  duration_ms: 2.335125
+  type: 'test'
+  ...
+# Subtest: encodeFrame: server frames are never masked and carry the correct length prefix
+ok 167 - encodeFrame: server frames are never masked and carry the correct length prefix
+  ---
+  duration_ms: 0.098542
+  type: 'test'
+  ...
+# Subtest: encodeFrame: uses the extended 16-bit length for payloads >= 126 bytes
+ok 168 - encodeFrame: uses the extended 16-bit length for payloads >= 126 bytes
+  ---
+  duration_ms: 0.091625
+  type: 'test'
+  ...
+# Subtest: sha1 sanity check backing acceptKeyFor
+ok 169 - sha1 sanity check backing acceptKeyFor
+  ---
+  duration_ms: 0.052125
+  type: 'test'
+  ...
+1..169
+# tests 169
+# suites 0
+# pass 169
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1503.199126
+EXIT=0

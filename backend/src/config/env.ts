@@ -23,8 +23,16 @@ function int(name: string, fallback: number): number {
 const nodeEnv = process.env.NODE_ENV ?? "development";
 const isProduction = nodeEnv === "production";
 
-if (isProduction && !process.env.JWT_ACCESS_SECRET) {
-  throw new Error("JWT_ACCESS_SECRET must be set in production");
+// Fail closed on anything that isn't explicitly "development" -- an exact
+// `isProduction` check here would silently let the hardcoded fallback
+// secret below sign real tokens whenever NODE_ENV is unset, mistyped, or
+// set to something like "staging" that a deploy target forgot to map to
+// "production". "development" is the only environment where booting
+// without a real secret is intentional.
+if (nodeEnv !== "development" && !process.env.JWT_ACCESS_SECRET) {
+  throw new Error(
+    `JWT_ACCESS_SECRET must be set when NODE_ENV is not "development" (got: "${nodeEnv}")`,
+  );
 }
 
 export const env = {
@@ -35,7 +43,19 @@ export const env = {
     "DATABASE_URL",
     "postgresql://rentit:rentit_dev_password@localhost:5432/rentit",
   ),
-  corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+  // Comma-separated list of allowed browser origins. Defaults to both
+  // Vite dev ports: Vite tries 5173 first but silently falls forward to
+  // 5174 (and beyond) whenever 5173 is already taken, with no code change
+  // needed on the frontend side -- if this only allowed 5173, every
+  // request from a 5174-served dev frontend would be silently rejected
+  // by the browser's CORS check (no console-visible backend error, just
+  // failed fetches), which is exactly the kind of "works on my machine
+  // sometimes" bug this list is meant to prevent. `cors` accepts an array
+  // of allowed origins natively.
+  corsOrigin: (process.env.CORS_ORIGIN ?? "http://localhost:5173,http://localhost:5174")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   logLevel: process.env.LOG_LEVEL ?? (isProduction ? "info" : "debug"),
 
   jwt: {
@@ -60,6 +80,13 @@ export const env = {
   rateLimit: {
     authWindowMs: int("RATE_LIMIT_AUTH_WINDOW_MS", 900000),
     authMax: int("RATE_LIMIT_AUTH_MAX", 10),
+    // Added during the production-readiness audit: chat messages and
+    // WhatsApp actions (contact-owner/inquiry/share) had no rate limiting
+    // at all -- share() in particular is unauthenticated, so an unlimited
+    // endpoint could be used to spam arbitrary phone numbers or run up
+    // provider costs. Generous defaults for real usage, cheap to lower.
+    messagingWindowMs: int("RATE_LIMIT_MESSAGING_WINDOW_MS", 60_000),
+    messagingMax: int("RATE_LIMIT_MESSAGING_MAX", 20),
   },
 
   cloudinary: {
@@ -103,4 +130,56 @@ export const env = {
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN ?? "",
   },
+
+  // --- Phase 6 Part 1: Payments ---
+
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID ?? "",
+    keySecret: process.env.RAZORPAY_KEY_SECRET ?? "",
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
+  },
+
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY ?? "",
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? "",
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  },
+
+  payments: {
+    currency: process.env.PAYMENT_CURRENCY ?? "INR",
+    // Amounts are the smallest currency unit (paise for INR) -- defaults
+    // below are illustrative; change per real pricing decisions.
+    featuredListingPriceAmount: int("FEATURED_LISTING_PRICE_AMOUNT", 19900),
+    featuredListingDurationDays: int("FEATURED_LISTING_DURATION_DAYS", 7),
+    boostListingPriceAmount: int("BOOST_LISTING_PRICE_AMOUNT", 9900),
+    boostListingDurationDays: int("BOOST_LISTING_DURATION_DAYS", 3),
+  },
+
+  rateLimitWebhook: {
+    windowMs: int("RATE_LIMIT_WEBHOOK_WINDOW_MS", 60_000),
+    max: int("RATE_LIMIT_WEBHOOK_MAX", 120),
+  },
+
+  // Added during the Phase 6 Part 2 security audit -- see rateLimiter.ts's
+  // createPaymentOrderRateLimiter doc comment.
+  rateLimitPaymentOrder: {
+    windowMs: int("RATE_LIMIT_PAYMENT_ORDER_WINDOW_MS", 600_000),
+    max: int("RATE_LIMIT_PAYMENT_ORDER_MAX", 10),
+  },
+
+  // --- Phase 6 Part 4: Observability ---
+
+  sentry: {
+    // Empty by default -> container.ts wires up NoOpErrorTracker instead
+    // of SentryErrorTracker. Setting this is the only step needed to turn
+    // on real error reporting; no code change required.
+    dsn: process.env.SENTRY_DSN ?? "",
+    release: process.env.SENTRY_RELEASE ?? process.env.npm_package_version ?? "unknown",
+  },
+
+  // Shared secret required in the Authorization header of GET /metrics --
+  // Prometheus scrape configs support `bearer_token`/`bearer_token_file`
+  // natively. Metrics expose route-level request-rate data that shouldn't
+  // be public on the open internet.
+  metricsToken: process.env.METRICS_TOKEN ?? "",
 } as const;

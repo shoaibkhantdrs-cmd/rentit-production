@@ -66,8 +66,9 @@ export class GetRecommendationsUseCase {
       .filter((item) => item.property.id !== excludeId)
       .slice(0, limit);
 
-    const dtos = await Promise.all(
-      items.map((item) => this.detailLoader.load(item.property, input.userId ?? null)),
+    const dtos = await this.detailLoader.loadMany(
+      items.map((item) => item.property),
+      input.userId ?? null,
     );
 
     return { items: dtos };

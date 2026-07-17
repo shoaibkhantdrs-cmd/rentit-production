@@ -1,0 +1,56 @@
+Phase 6 Part 9 - Final QA: accessibility audit
+
+Scope: frontend/src, grepped and manually spot-checked (no browser/axe/
+Lighthouse available in this sandbox -- see note at the end).
+
+Checked, already correct:
+- Every <img> in the app (6 total) has an alt attribute -- confirmed by
+  comparing total <img> count to alt= count (6 and 6).
+- Form inputs use <label htmlFor="..."> paired with matching id="..."
+  attributes (60 <label> elements, 44 explicit htmlFor pairings spot-
+  checked in AuthPanel.tsx; the remainder wrap their input directly,
+  also a valid association method).
+- <html lang="en"> is set in index.html.
+- Icon-only buttons already use aria-label + title (e.g. AdminLayout's
+  dark-mode toggle: aria-label="Toggle dark mode").
+- 12 instances of aria-hidden="true" on decorative icon/emoji spans,
+  keeping them out of the accessibility tree so a screen reader doesn't
+  announce a raw emoji character where a text label already conveys the
+  same information alongside it.
+- Some :focus / :focus-visible styling already existed in the stylesheet
+  prior to this pass (10 rules).
+
+Real finding + fix:
+- No "skip to main content" link existed anywhere in the app (WCAG 2.4.1,
+  Bypass Blocks) -- every page has a persistent top nav (Layout.tsx) or
+  sidebar (AdminLayout.tsx) that a keyboard or screen-reader user would
+  have to tab through in full on every single page load before reaching
+  the actual page content. FIXED: added a .skip-link (visually hidden
+  until it receives keyboard focus, then appears at the top-left) as the
+  first focusable element in both Layout.tsx and AdminLayout.tsx, linking
+  to id="main-content"/"admin-main-content" on each layout's <main>
+  element. tabIndex={-1} added to both <main> elements so focus actually
+  moves there when the link is activated (required for this to work
+  correctly in Safari, not just visually scroll).
+- Re-ran the real tsc typecheck (see phase6-part9-typecheck-audit.log)
+  after this change: error count moved from 2153 to 2157, all 4 new
+  lines being the same "JSX element implicitly has type any" cascade
+  from missing @types/react that dominates the rest of the log -- no new
+  distinct error category, confirming this change didn't introduce a
+  real bug.
+
+Not checked (requires tooling this sandbox doesn't have):
+- Color contrast ratios (would need the actual rendered CSS custom
+  property values checked against WCAG AA/AAA thresholds with a real
+  contrast checker, not a grep).
+- Actual screen reader behavior (VoiceOver/NVDA/JAWS) and actual keyboard-
+  only navigation through every interactive flow (modals, the chat
+  thread, payment forms) -- static analysis can catch missing landmarks/
+  labels/alt text, not runtime focus-trap or ARIA-live-region correctness.
+- A real axe-core or Lighthouse accessibility audit -- neither is
+  installable here (no npm registry access, consistent with every other
+  "requires real tooling" gap in this phase).
+
+Recommendation before launch: run a real Lighthouse accessibility audit
+and at least one manual keyboard-only pass through registration, search,
+messaging, and checkout in an actual browser.

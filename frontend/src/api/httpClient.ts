@@ -17,7 +17,7 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   /** FormData for multipart uploads -- skips JSON.stringify + Content-Type. */
   formData?: FormData;
@@ -174,6 +174,12 @@ export const httpClient = {
 
   patch: <T,>(path: string, body?: unknown, authenticated = true) =>
     request<T>(path, { method: "PATCH", body, authenticated }),
+
+  // RC1: added for adminApi.updateUserRoles, which was calling a PATCH
+  // that the backend has never accepted -- the route is PUT (see
+  // backend/src/interfaces/http/routes/admin.routes.ts).
+  put: <T,>(path: string, body?: unknown, authenticated = true) =>
+    request<T>(path, { method: "PUT", body, authenticated }),
 
   delete: <T,>(path: string, authenticated = true) => request<T>(path, { method: "DELETE", authenticated }),
 };

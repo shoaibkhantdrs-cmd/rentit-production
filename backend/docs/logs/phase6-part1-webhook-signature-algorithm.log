@@ -1,0 +1,14 @@
+PASS: razorpay: valid signature accepted
+PASS: razorpay: wrong secret rejected
+PASS: razorpay: tampered body rejected
+PASS: razorpay: missing signature rejected
+PASS: razorpay: garbage signature rejected (no throw)
+PASS: razorpay: truncated valid-hex signature rejected
+PASS: stripe: valid signature accepted
+PASS: stripe: wrong secret rejected
+PASS: stripe: expired timestamp rejected
+PASS: stripe: missing v1 rejected
+PASS: stripe: tampered body rejected
+PASS: stripe: future timestamp beyond tolerance rejected
+
+12 passed, 0 failed

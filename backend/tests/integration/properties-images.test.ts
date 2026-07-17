@@ -175,7 +175,7 @@ test("DeletePropertyImageUseCase: 404s for an image that doesn't belong to the p
 });
 
 test("FavoriteProperty / UnfavoriteProperty: idempotent and maintains a denormalized favorite count", async () => {
-  const { container, owner, property } = await setup();
+  const { container, property } = await setup();
   const user = await container.repos.userRepo.create({ name: "Fan", email: "fan@example.com" });
 
   await container.favoriteProperty.execute(property.id, user.id);
