@@ -1,0 +1,89 @@
+# Render Blueprint (Infrastructure-as-Code) for the rentit-backend service.
+#
+# This codifies the settings that otherwise only live in the Render
+# dashboard (Root Directory, Build Command, Start Command) so they're
+# reviewable and reproducible from the repo. If `rentit-backend` was
+# created manually in the dashboard rather than from this blueprint, this
+# file does NOT retroactively change that service's settings -- Render
+# only applies a blueprint when a service is created via "New +" ->
+# "Blueprint", or when you click "Sync" on a service already linked to
+# one. To bring an existing manually-created service in line with this
+# file, either match these values by hand in Dashboard -> rentit-backend
+# -> Settings, or delete and recreate the service from this blueprint.
+#
+# Deliberately NOT setting NODE_ENV here: Render sets it to "production"
+# by default, and the app's own boot guard (backend/src/config/env.ts)
+# depends on that to require a real JWT_ACCESS_SECRET. The actual build
+# failure this file is part of fixing (npm silently skipping
+# devDependencies because of that same NODE_ENV=production) is handled at
+# the npm-config level instead, in backend/.npmrc -- so the app still
+# gets a correct "production" runtime without npm treating the build step
+# as production too.
+services:
+  - type: web
+    name: rentit-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health/live
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: FRONTEND_BASE_URL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_ADDRESS
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: METRICS_TOKEN
+        sync: false
