@@ -38,7 +38,7 @@
     "pino-http": "^10.2.0",
     "zod": "^3.23.8"
   },
-  "devDependencies": {
+    "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
@@ -57,3 +57,5 @@
     "typescript": "^5.5.4"
   }
 }
+
+
