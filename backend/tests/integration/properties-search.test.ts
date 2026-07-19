@@ -30,10 +30,24 @@ async function seedListing(
 
   const created = await container.createProperty.execute(input);
   if (publish) {
+    // Owners can only submit a listing for review; only an admin may
+    // publish it (UpdatePropertyUseCase's self-publish guard). Each seeded
+    // listing gets its own admin user since this helper has no shared test
+    // fixture to reuse.
     await container.updateProperty.execute({
       propertyId: created.id,
       requesterId: ownerId,
       requesterRoles: ["property_owner"],
+      status: "pending_review",
+    });
+    const admin = await container.repos.userRepo.create({
+      name: "Admin",
+      email: `admin-${created.id}@example.com`,
+    });
+    await container.updateProperty.execute({
+      propertyId: created.id,
+      requesterId: admin.id,
+      requesterRoles: ["admin"],
       status: "published",
     });
   }

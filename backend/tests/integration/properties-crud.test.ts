@@ -124,10 +124,20 @@ test("GetPropertyUseCase: increments view count once per viewer within the dedup
   const container = buildPropertyTestContainer();
   const { owner, category } = await setupOwnerAndCategory(container);
   const created = await container.createProperty.execute(baseCreateInput(owner.id, category.id));
+
+  // Owners can only submit a listing for review; only an admin may publish
+  // it (UpdatePropertyUseCase's self-publish guard).
   await container.updateProperty.execute({
     propertyId: created.id,
     requesterId: owner.id,
     requesterRoles: ["property_owner"],
+    status: "pending_review",
+  });
+  const admin = await container.repos.userRepo.create({ name: "Admin", email: "admin-viewcount@example.com" });
+  await container.updateProperty.execute({
+    propertyId: created.id,
+    requesterId: admin.id,
+    requesterRoles: ["admin"],
     status: "published",
   });
 
@@ -151,27 +161,44 @@ test("GetPropertyUseCase: increments view count once per viewer within the dedup
   assert.equal(third.viewCount, 2, "a view after the dedup window should count again");
 });
 
-test("UpdatePropertyUseCase: owner can update fields, records status history on status change", async () => {
+test("UpdatePropertyUseCase: owner can update fields and submit for review; admin approves and publishes; status history records each step", async () => {
   const container = buildPropertyTestContainer();
   const { owner, category } = await setupOwnerAndCategory(container);
   const created = await container.createProperty.execute(baseCreateInput(owner.id, category.id));
+  const admin = await container.repos.userRepo.create({ name: "Admin", email: "admin-crud@example.com" });
 
-  const updated = await container.updateProperty.execute({
+  // Owner can update fields and move their own listing to pending_review in
+  // the same call -- only "published" (and reversing an admin "inactive")
+  // is admin-only.
+  const submitted = await container.updateProperty.execute({
     propertyId: created.id,
     requesterId: owner.id,
     requesterRoles: ["property_owner"],
     rentAmount: 40000,
+    status: "pending_review",
+  });
+
+  assert.equal(submitted.rentAmount, 40000);
+  assert.equal(submitted.status, "pending_review");
+
+  // Only an admin may publish it.
+  const published = await container.updateProperty.execute({
+    propertyId: created.id,
+    requesterId: admin.id,
+    requesterRoles: ["admin"],
     status: "published",
   });
 
-  assert.equal(updated.rentAmount, 40000);
-  assert.equal(updated.status, "published");
-  assert.equal(updated.publishedAt !== null, true);
+  assert.equal(published.rentAmount, 40000);
+  assert.equal(published.status, "published");
+  assert.equal(published.publishedAt !== null, true);
 
   const historyEntries = container.repos.statusHistoryRepo.entries;
-  assert.equal(historyEntries.length, 2); // created (draft) + published
+  assert.equal(historyEntries.length, 3); // created (draft) + pending_review + published
   assert.equal(historyEntries[1].previousStatus, "draft");
-  assert.equal(historyEntries[1].newStatus, "published");
+  assert.equal(historyEntries[1].newStatus, "pending_review");
+  assert.equal(historyEntries[2].previousStatus, "pending_review");
+  assert.equal(historyEntries[2].newStatus, "published");
 });
 
 test("UpdatePropertyUseCase: re-geocodes only when address changes without explicit coordinates", async () => {
