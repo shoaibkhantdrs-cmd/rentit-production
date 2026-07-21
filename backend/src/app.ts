@@ -81,7 +81,14 @@ export function createApp(): { app: express.Express; container: Container } {
   // route so a Prometheus scrape config can point at one fixed path
   // regardless of how the rest of the API is versioned/restructured.
   app.use("/metrics", metricsRouter);
-
+app.get("/", (_req, res) => {
+  res.json({
+    service: "RentIt Backend",
+    status: "OK",
+    version: "1.0",
+    timestamp: new Date().toISOString(),
+  });
+});
   app.use(
     "/",
     createApiRouter({
