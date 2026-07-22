@@ -33,8 +33,13 @@ services:
         sync: false
       - key: JWT_ACCESS_SECRET
         sync: false
+      # Real deployed frontend origin (not a secret -- it's the public
+      # site URL). CORS is an explicit allowlist (see env.ts/app.ts), so
+      # this must exactly match the frontend's live origin, scheme
+      # included, no trailing slash, or every browser request from it
+      # gets blocked before your app ever sees it.
       - key: CORS_ORIGIN
-        sync: false
+        value: https://rentit-frontend-gd1c.onrender.com
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
@@ -87,3 +92,33 @@ services:
         sync: false
       - key: METRICS_TOKEN
         sync: false
+
+  # Static frontend. Same caveat as rentit-backend above: this codifies
+  # the intended config, but won't retroactively apply to
+  # rentit-frontend-gd1c if that service was created manually rather than
+  # from this blueprint -- match these settings by hand in Dashboard ->
+  # rentit-frontend-gd1c -> Settings if so.
+  - type: web
+    name: rentit-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      # Build-time only -- Vite bakes this into the static bundle at
+      # `npm run build` time, so changing it requires a rebuild, not just
+      # a restart. Root cause of the CORS/"listings don't load" bug this
+      # fixes: this was never set on the actual deployed frontend, so the
+      # app fell back to the (previously broken) dev default and never
+      # once reached the real backend.
+      - key: VITE_API_BASE_URL
+        value: https://rentit-backend-qo5t.onrender.com
+    routes:
+      # SPA fallback: React Router owns client-side routing, so any path
+      # not matching a real static asset (e.g. a deep link to
+      # /properties/123 or a hard refresh on it) must still serve
+      # index.html rather than 404 -- the same rule Netlify's
+      # frontend/public/_redirects covers for that host.
+      - type: rewrite
+        source: /*
+        destination: /index.html
