@@ -4,10 +4,11 @@ import { IAuditLogRepository } from "@/domain/repositories/IAuditLogRepository";
 import { IHasher } from "@/domain/services/IHasher";
 import { IClock } from "@/domain/services/IClock";
 import { toPublicUser, User } from "@/domain/entities/User";
-import { ForbiddenError, UnauthorizedError } from "@/domain/errors/AppError";
+import { ForbiddenError, ServiceUnavailableError, UnauthorizedError } from "@/domain/errors/AppError";
 import { SessionIssuer, DeviceContext } from "@/application/auth/shared/SessionIssuer";
 import { OtpIssuer } from "@/application/auth/shared/OtpIssuer";
 import { parseIdentifier } from "@/application/auth/shared/identifier";
+import { logger } from "@/infrastructure/logging/logger";
 
 export interface LoginUserInput {
   identifier: string;
@@ -49,7 +50,14 @@ export class LoginUserUseCase {
       return this.loginWithPassword(user, input.password, input.device);
     }
 
-    await this.otpIssuer.issue(user, "login");
+try {
+        await this.otpIssuer.issue(user, "login");
+} catch (err) {
+        logger.error({ err, userId: user.id }, "Failed to issue login OTP");
+        throw new ServiceUnavailableError(
+                  "We couldn't send your login code right now. Please try again in a moment.",
+                );
+}
     await this.auditLogRepo.record({
       userId: user.id,
       action: "auth.login.otp_requested",
