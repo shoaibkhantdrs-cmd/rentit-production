@@ -3,17 +3,19 @@ import { ApiErrorBody } from "./types";
 import { tokenStore } from "./tokenStore";
 
 export class ApiError extends Error {
-  public readonly status: number;
-  public readonly code: string;
-  public readonly details?: unknown;
+    public readonly status: number;
+    public readonly code: string;
+    public readonly details?: unknown;
+    public readonly requestId?: string;
 
-  constructor(status: number, code: string, message: string, details?: unknown) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    this.code = code;
-    this.details = details;
-  }
+    constructor(status: number, code: string, message: string, details?: unknown, requestId?: string) {
+          super(message);
+          this.name = "ApiError";
+          this.status = status;
+          this.code = code;
+          this.details = details;
+          this.requestId = requestId;
+    }
 }
 
 interface RequestOptions {
@@ -141,7 +143,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     const parsed = (await parseBody(res)) as ApiErrorBody | null;
     const message = parsed?.error?.message ?? `Request failed with status ${res.status}`;
     const code = parsed?.error?.code ?? "UNKNOWN_ERROR";
-    throw new ApiError(res.status, code, message, parsed?.error?.details);
+        throw new ApiError(res.status, code, message, parsed?.error?.details, parsed?.requestId);
   }
 
   return (await parseBody(res)) as T;
