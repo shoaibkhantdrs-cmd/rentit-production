@@ -10,6 +10,7 @@ import { SessionIssuer, DeviceContext } from "@/application/auth/shared/SessionI
 import { OtpIssuer } from "@/application/auth/shared/OtpIssuer";
 import { IEmailService } from "@/domain/services/IEmailService";
 import { buildWelcomeEmail } from "@/application/notifications/EmailTemplates";
+import { logger } from "@/infrastructure/logging/logger";
 
 export interface RegisterUserInput {
   name: string;
@@ -74,13 +75,23 @@ export class RegisterUserUseCase {
       userAgent: input.device.userAgent,
     });
 
-    // Fire-and-forget-but-awaited verification codes. Failure to send should
-    // not fail registration itself once the account row exists.
-    await this.otpIssuer.issue(user, "email_verification");
-    if (input.phone) {
-      await this.otpIssuer.issue(user, "phone_verification");
-    }
-    await this.emailService.send(buildWelcomeEmail(user.email, user.name));
+// Verification codes and the welcome email are best-effort: the account
+        // row already exists at this point, so a notification-provider failure
+        // (e.g. SMTP misconfiguration) must never fail registration itself.
+        try {
+                await this.otpIssuer.issue(user, "email_verification");
+                if (input.phone) {
+                          await this.otpIssuer.issue(user, "phone_verification");
+                }
+        } catch (err) {
+                logger.error({ err, userId: user.id }, "Failed to issue verification OTP during registration");
+        }
+
+        try {
+                await this.emailService.send(buildWelcomeEmail(user.email, user.name));
+        } catch (err) {
+                logger.error({ err, userId: user.id }, "Failed to send welcome email during registration");
+        }
 
     const roleNames = await this.userRoleRepo.listRoleNamesForUser(user.id);
     const tokens = await this.sessionIssuer.issue(user.id, roleNames, input.device);
