@@ -34,7 +34,13 @@ export function AuthPanel({ message }: { message?: string }) {
       await requestLoginOtp(identifier.trim());
       setStep("otp");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not start login. Please try again.");
+            setError(
+                      err instanceof ApiError
+                        ? err.requestId
+                          ? `${err.message} (Ref: ${err.requestId})`
+                          : err.message
+                        : "Could not start login. Please try again.",
+                    );
     } finally {
       setSubmitting(false);
     }
@@ -47,11 +53,13 @@ export function AuthPanel({ message }: { message?: string }) {
     try {
       await verifyLoginOtp(identifier.trim(), code.trim());
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? "No account found or the code was wrong. New here? Use \"Create an account\" below."
-          : "Could not verify the code. Please try again.",
-      );
+            setError(
+      err instanceof ApiError
+                ? `No account found or the code was wrong. New here? Use "Create an account" below.${
+                                err.requestId ? ` (Ref: ${err.requestId})` : ""
+                }`
+                : "Could not verify the code. Please try again.",
+            );
     } finally {
       setSubmitting(false);
     }
@@ -64,7 +72,13 @@ export function AuthPanel({ message }: { message?: string }) {
     try {
       await register({ name: name.trim(), email: identifier.trim() });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not create your account. Please try again.");
+            setError(
+                      err instanceof ApiError
+                        ? err.requestId
+                          ? `${err.message} (Ref: ${err.requestId})`
+                          : err.message
+                        : "Could not create your account. Please try again.",
+                    );
     } finally {
       setSubmitting(false);
     }
