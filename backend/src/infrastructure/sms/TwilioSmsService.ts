@@ -9,7 +9,7 @@ export interface TwilioConfig {
 /**
  * Real Twilio Programmable Messaging REST API integration via the
  * platform's built-in `fetch` -- Twilio's API is plain HTTP + Basic Auth,
- * so (like GoogleGeocodingService) no SDK is needed even without npm
+ * so (like NominatimGeocodingService) no SDK is needed even without npm
  * registry access.
  */
 export class TwilioSmsService implements ISmsService {

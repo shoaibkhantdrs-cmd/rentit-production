@@ -46,8 +46,9 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
-      - key: GOOGLE_MAPS_API_KEY
-        sync: false
+      # GOOGLE_MAPS_API_KEY removed 2026-07-29: geocoding now uses
+      # OpenStreetMap's Nominatim (NominatimGeocodingService), which is
+      # free and keyless -- no env var needed here.
       - key: FRONTEND_BASE_URL
         sync: false
       - key: SMTP_HOST

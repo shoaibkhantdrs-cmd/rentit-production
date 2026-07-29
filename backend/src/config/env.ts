@@ -106,8 +106,9 @@ export const env = {
     apiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
   },
 
-  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
-
+  // Google Maps Geocoding was removed 2026-07-29 in favor of Nominatim
+  // (OpenStreetMap) -- see NominatimGeocodingService, which needs no API
+  // key at all. No env var replaces this one.
   maxImageUploadBytes: int("MAX_IMAGE_UPLOAD_BYTES", 10 * 1024 * 1024),
 
   // --- Phase 5 ---

@@ -39,7 +39,7 @@ import { UserReportRepository } from "@/infrastructure/database/repositories/Use
 import { IdentityVerificationRepository } from "@/infrastructure/database/repositories/IdentityVerificationRepository";
 import { AdminAnalyticsRepository } from "@/infrastructure/database/repositories/AdminAnalyticsRepository";
 import { CloudinaryImageStorageService } from "@/infrastructure/storage/CloudinaryImageStorageService";
-import { GoogleGeocodingService } from "@/infrastructure/maps/GoogleGeocodingService";
+import { NominatimGeocodingService } from "@/infrastructure/maps/NominatimGeocodingService";
 import { ConsolePushNotificationService } from "@/infrastructure/notifications/ConsolePushNotificationService";
 import { FcmPushNotificationService } from "@/infrastructure/notifications/FcmPushNotificationService";
 import { PostgresHealthCheckService } from "@/infrastructure/database/PostgresHealthCheckService";
@@ -252,7 +252,7 @@ export function buildContainer() {
   const webhookEventRepo = new WebhookEventRepository(pool);
 
   const imageStorage = new CloudinaryImageStorageService(env.cloudinary);
-  const geocodingService = new GoogleGeocodingService(env.googleMapsApiKey);
+  const geocodingService = new NominatimGeocodingService();
   const healthCheckService = new PostgresHealthCheckService(pool);
 
   // Phase 6 Part 4 (observability): only wire the real Sentry HTTP client

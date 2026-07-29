@@ -56,7 +56,9 @@ services:
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
       MAX_IMAGE_UPLOAD_BYTES: ${MAX_IMAGE_UPLOAD_BYTES:-10485760}
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      # GOOGLE_MAPS_API_KEY removed 2026-07-29: geocoding now uses
+      # OpenStreetMap's Nominatim (NominatimGeocodingService), free and
+      # keyless -- no env var needed here.
       # Phase 5: chat/notifications/WhatsApp providers. Same gap -- these
       # existed in backend/src/config/env.ts but were never added here.
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}

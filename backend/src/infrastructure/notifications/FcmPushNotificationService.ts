@@ -27,7 +27,7 @@ function base64url(input: Buffer | string): string {
 /**
  * Real Firebase Cloud Messaging (HTTP v1 API) integration, built on the
  * platform's built-in `fetch` and `crypto` -- the same "no SDK needed for
- * one REST call" call made in GoogleGeocodingService. `firebase-admin`
+ * one REST call" call made in NominatimGeocodingService. `firebase-admin`
  * couldn't be added here regardless (no npm registry access in this
  * sandbox -- see docs/phase-5.md), so this hand-rolls exactly the piece
  * of it actually needed: the service-account JWT-bearer OAuth2 exchange,

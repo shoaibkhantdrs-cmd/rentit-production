@@ -21,7 +21,7 @@ export interface BrevoConfig {
  *
  * Brevo's send API is plain HTTPS (port 443), which is not affected by
  * that block -- the same "no SDK, just fetch" approach already used for
- * TwilioSmsService/GoogleGeocodingService. It's also one of the few
+ * TwilioSmsService/NominatimGeocodingService. It's also one of the few
  * transactional-email providers whose sender verification only requires
  * proving control of a single email address (a confirmation link sent to
  * that address), not owning a domain with SPF/DKIM records -- which fits

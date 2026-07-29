@@ -5,7 +5,7 @@ export interface GeocodeResult {
   placeId: string | null;
 }
 
-/** Port over Google's Geocoding API -- see infrastructure/maps/GoogleGeocodingService.ts. */
+/** Port over Nominatim (OpenStreetMap) -- see infrastructure/maps/NominatimGeocodingService.ts. */
 export interface IGeocodingService {
   geocode(addressLine: string, city: string, locality?: string | null): Promise<GeocodeResult>;
 }
