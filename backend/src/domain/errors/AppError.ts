@@ -55,9 +55,16 @@ export class TooManyRequestsError extends AppError {
   }
 }
 
+/**
+ * A downstream dependency (SMTP, SMS, a third-party API) failed in a way
+ * that isn't the caller's fault and isn't a bug in our own logic --
+ * distinct from an unclassified crash (which errorHandler.ts treats as a
+ * generic 500 with no diagnosable code) so an operator reading logs can
+ * immediately tell "our code has a bug" apart from "a dependency we don't
+ * control is down/misconfigured."
+ */
 export class ServiceUnavailableError extends AppError {
-  constructor(message = "Service temporarily unavailable") {
-    super(message, 503, "SERVICE_UNAVAILABLE");
+  constructor(message = "A required service is temporarily unavailable", details?: unknown) {
+    super(message, 503, "SERVICE_UNAVAILABLE", details);
   }
 }
-

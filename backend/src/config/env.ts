@@ -43,6 +43,17 @@ export const env = {
     "DATABASE_URL",
     "postgresql://rentit:rentit_dev_password@localhost:5432/rentit",
   ),
+  // Opt-in TLS for the shared pg Pool (database.ts). Off by default, which
+  // preserves the deployed app's behavior exactly -- it connects over
+  // Render's private network via the Internal Database URL and has never
+  // needed this. It only needs to be true for a connection that crosses
+  // the public internet to a managed Postgres provider that requires SSL
+  // there, e.g. pointing DATABASE_URL at Render's *External* Database URL
+  // -- which is exactly what scripts/bootstrap-admin.ts has to do when run
+  // from outside Render (see docs/ADMIN_BOOTSTRAP.md). Without this, `pg`
+  // never attempts SSL and the server rejects the connection with
+  // "SSL/TLS required".
+  databaseSsl: process.env.DATABASE_SSL === "true",
   // Comma-separated list of allowed browser origins. Defaults to both
   // Vite dev ports: Vite tries 5173 first but silently falls forward to
   // 5174 (and beyond) whenever 5173 is already taken, with no code change
@@ -110,6 +121,15 @@ export const env = {
     username: process.env.SMTP_USERNAME ?? "",
     password: process.env.SMTP_PASSWORD ?? "",
     fromAddress: process.env.SMTP_FROM_ADDRESS ?? "no-reply@rentit.example",
+  },
+
+  // HTTP-API email fallback (BrevoEmailService) -- see that file's doc
+  // comment. Empty by default so nothing changes for local dev/anyone
+  // already relying on real SMTP; container.ts only switches to Brevo when
+  // this is set, which it must be for any Render free-tier deployment
+  // since that plan blocks outbound SMTP entirely.
+  brevo: {
+    apiKey: process.env.BREVO_API_KEY ?? "",
   },
 
   twilio: {

@@ -138,7 +138,10 @@ test("logout-all revokes every session/refresh token for the user across devices
     email: "multidevice@example.com",
     device: TEST_DEVICE,
   });
-  const { refreshToken: tokenB } = await c.loginUser.execute({
+  // This call issues an OTP rather than tokens (no password + LoginUserResult
+  // is a union keyed on `mode`), so there's nothing to destructure here --
+  // the actual tokens for "device-2" come from verifyOtp below.
+  await c.loginUser.execute({
     identifier: "multidevice@example.com",
     password: undefined,
     device: { ...TEST_DEVICE, deviceId: "device-2" },
@@ -151,7 +154,10 @@ test("logout-all revokes every session/refresh token for the user across devices
     device: { ...TEST_DEVICE, deviceId: "device-2" },
   });
   assert.equal(otpResult.authenticated, true);
-  const tokenBResolved = otpResult.authenticated ? otpResult.refreshToken : tokenB;
+  if (!otpResult.authenticated) {
+    throw new Error("expected verifyOtp to authenticate device-2");
+  }
+  const tokenBResolved = otpResult.refreshToken;
 
   const { revokedSessions } = await c.logoutAllDevices.execute({ userId: user.id });
   assert.equal(revokedSessions, 2);

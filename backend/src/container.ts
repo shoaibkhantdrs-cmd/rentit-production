@@ -51,6 +51,7 @@ import { SavedSearchRepository } from "@/infrastructure/database/repositories/Sa
 import { WebSocketGateway } from "@/infrastructure/realtime/WebSocketGateway";
 import { ConsoleEmailService } from "@/infrastructure/email/ConsoleEmailService";
 import { SmtpEmailService } from "@/infrastructure/email/SmtpEmailService";
+import { BrevoEmailService } from "@/infrastructure/email/BrevoEmailService";
 import { ConsoleSmsService } from "@/infrastructure/sms/ConsoleSmsService";
 import { TwilioSmsService } from "@/infrastructure/sms/TwilioSmsService";
 import { ChannelNotificationSender } from "@/infrastructure/notifications/ChannelNotificationSender";
@@ -285,7 +286,16 @@ export function buildContainer() {
     : new ConsolePushNotificationService();
 
   // --- Phase 5: email & SMS providers (Part 3) ---
-  const emailService = env.smtp.host ? new SmtpEmailService(env.smtp) : new ConsoleEmailService();
+  // Brevo (HTTP API over 443) takes priority over raw SMTP when configured
+  // -- see BrevoEmailService's doc comment: Render's free tier blocks
+  // outbound SMTP ports entirely, so any Render deployment needs
+  // BREVO_API_KEY set. Local dev / any host that doesn't block SMTP can
+  // leave BREVO_API_KEY unset and keep using SMTP_HOST unchanged.
+  const emailService = env.brevo.apiKey
+    ? new BrevoEmailService({ apiKey: env.brevo.apiKey, fromAddress: env.smtp.fromAddress })
+    : env.smtp.host
+      ? new SmtpEmailService(env.smtp)
+      : new ConsoleEmailService();
   const smsService = env.twilio.accountSid
     ? new TwilioSmsService(env.twilio)
     : new ConsoleSmsService();

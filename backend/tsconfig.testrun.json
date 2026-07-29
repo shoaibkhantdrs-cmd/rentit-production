@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "Node16",
+    "moduleResolution": "node16",
+    "rootDir": ".",
+    "outDir": "./dist-testrun",
+    "baseUrl": ".",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": [
+    "tests/integration/auth-register-verify-login.test.ts",
+    "tests/integration/otp-limits-and-guards.test.ts",
+    "tests/integration/password-login-and-reset.test.ts",
+    "tests/integration/refresh-rotation-and-reuse.test.ts",
+    "tests/unit/OtpVerifier.test.ts"
+  ],
+  "exclude": ["node_modules", "dist", "dist-testrun"]
+}

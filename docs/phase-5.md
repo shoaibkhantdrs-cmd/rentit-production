@@ -311,6 +311,29 @@ SMTP_FROM_ADDRESS=no-reply@yourdomain.example
 FRONTEND_BASE_URL=https://your-frontend-domain.example   # used in email links
 ```
 
+**Render deployments: use Brevo instead (or alongside).** Confirmed during
+production QA (2026-07-29): Render's free web-service tier blocks all
+outbound traffic to SMTP ports 25/465/587 at the network level -- live
+logs showed the raw TCP connect itself failing (`ETIMEDOUT`/`ENETUNREACH`)
+before any SMTP command was ever sent, regardless of how correct
+`SMTP_HOST`/`SMTP_USERNAME`/`SMTP_PASSWORD` are. See:
+https://render.com/changelog/free-web-services-will-no-longer-allow-outbound-traffic-to-smtp-ports
+
+`container.ts` now prefers `BrevoEmailService` (plain HTTPS, unaffected by
+that block) whenever `BREVO_API_KEY` is set, falling back to `SMTP_HOST`
+only when it isn't -- so local dev can keep using real Gmail SMTP
+unchanged while a Render deployment uses Brevo:
+
+```
+BREVO_API_KEY=xkeysib-...      # Brevo -> Settings -> SMTP & API -> API Keys
+```
+
+Brevo only requires verifying the *sender email address itself* (a
+confirmation link sent to `SMTP_FROM_ADDRESS`) before it will relay to any
+recipient -- no custom domain or DNS/SPF/DKIM records needed, which fits a
+deployment on Render's own `onrender.com` subdomains. Free tier covers
+300 emails/day.
+
 **Twilio (SMS)** -- create a Twilio account, buy/verify a sending number:
 
 ```

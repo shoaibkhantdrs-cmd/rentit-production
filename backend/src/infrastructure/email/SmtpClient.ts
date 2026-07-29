@@ -20,6 +20,23 @@ export interface SmtpEnvelope {
 }
 
 /**
+ * Bug fix: neither the raw TCP connect nor any subsequent read ever had a
+ * timeout. If the SMTP host is unreachable -- wrong host, or (very common
+ * on free-tier PaaS hosts) the platform silently drops/blocks outbound
+ * connections on the mail port -- `createConnection`/`tlsConnect` just
+ * hang with no 'error' and no 'connect' event, ever. With no timeout, that
+ * hung Promise never resolves or rejects, so the entire HTTP request
+ * (register/login/forgot-password) hangs until the platform's own gateway
+ * timeout kills it -- which returns a 503 with zero application-level
+ * logging, since the request never reaches pino-http's "request
+ * completed" line or errorHandler.ts's catch block. `socket.setTimeout()`
+ * is an *idle* timer (resets on any traffic), so this fires only when a
+ * step genuinely stalls, not just because the whole exchange takes a
+ * few round trips.
+ */
+const IDLE_TIMEOUT_MS = 10_000;
+
+/**
  * A minimal SMTP client (RFC 5321/2487) built on nothing but Node's
  * built-in `net`/`tls` modules -- the same "hand-roll the protocol, no
  * SDK" call made for chat's WebSocketGateway and FCM's OAuth2 exchange,
@@ -69,6 +86,19 @@ export class SmtpClient {
       const socket = this.config.secure
         ? tlsConnect({ host: this.config.host, port: this.config.port })
         : createConnection({ host: this.config.host, port: this.config.port });
+
+      socket.setTimeout(IDLE_TIMEOUT_MS);
+      socket.once("timeout", () => {
+        // destroy(err) emits 'error' with this err, so the `once("error",
+        // reject)` below still fires -- no separate reject path needed.
+        socket.destroy(
+          new Error(
+            `SMTP connection to ${this.config.host}:${this.config.port} timed out after ${
+              IDLE_TIMEOUT_MS / 1000
+            }s (host unreachable or the port is blocked)`,
+          ),
+        );
+      });
 
       socket.once("error", reject);
       socket.once("connect", () => resolve(socket));
@@ -125,6 +155,14 @@ function readResponse(socket: Socket | TLSSocket, expectedCodes: number[]): Prom
 function upgradeToTls(socket: Socket, host: string): Promise<TLSSocket> {
   return new Promise((resolve, reject) => {
     const tlsSocket = tlsConnect({ socket, host });
+
+    tlsSocket.setTimeout(IDLE_TIMEOUT_MS);
+    tlsSocket.once("timeout", () => {
+      tlsSocket.destroy(
+        new Error(`STARTTLS upgrade to ${host} timed out after ${IDLE_TIMEOUT_MS / 1000}s`),
+      );
+    });
+
     tlsSocket.once("secureConnect", () => resolve(tlsSocket));
     tlsSocket.once("error", reject);
   });

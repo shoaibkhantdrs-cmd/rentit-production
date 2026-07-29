@@ -14,6 +14,7 @@
     "lint:fix": "eslint . --ext ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
+    "typecheck:scripts": "tsc --noEmit -p tsconfig.verify.json",
     "migrate:up": "node-pg-migrate up -m db/migrations -j js",
     "migrate:down": "node-pg-migrate down -m db/migrations -j js",
     "migrate:create": "node-pg-migrate create -m db/migrations -j js --",
@@ -22,7 +23,8 @@
     "test:integration": "node --import tsx --test tests/integration/**/*.test.ts",
     "backup:db": "bash scripts/backup-db.sh",
     "restore:db": "bash scripts/restore-db.sh",
-    "test:smtp": "tsx scripts/test-smtp.ts"
+    "test:smtp": "tsx scripts/test-smtp.ts",
+    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

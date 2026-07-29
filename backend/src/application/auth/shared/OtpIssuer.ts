@@ -7,7 +7,7 @@ import { IClock } from "@/domain/services/IClock";
 import { AuthConfig } from "@/application/dtos/AuthConfig";
 import { OtpPurpose } from "@/domain/entities/OtpCode";
 import { User } from "@/domain/entities/User";
-import { ValidationError } from "@/domain/errors/AppError";
+import { ServiceUnavailableError, ValidationError } from "@/domain/errors/AppError";
 
 const PURPOSE_COPY: Record<OtpPurpose, { title: string; label: string }> = {
   login: { title: "Your login code", label: "log in" },
@@ -57,14 +57,37 @@ export class OtpIssuer {
 
     const copy = PURPOSE_COPY[purpose];
 
-    await this.notificationSender.send({
-      channel,
-      to: destination,
-      subject: copy.title,
-      body: `Your code to ${copy.label} is ${code}. It expires in ${Math.round(
-        this.config.otpTtlSeconds / 60,
-      )} minutes. Do not share it with anyone.`,
-    });
+    // Bug fix: this call previously had no error handling at all. A
+    // downstream delivery failure (wrong SMTP port/TLS mode, bad Gmail
+    // App Password, DNS/network issue reaching the SMTP host, etc.) threw
+    // a plain, unclassified Error straight out of SmtpClient -- which
+    // propagated uncaught all the way to errorHandler.ts's generic 500
+    // branch ("Something went wrong"), even though the OTP row above had
+    // already been written successfully. That's indistinguishable from an
+    // actual application bug in logs/monitoring and gives the caller no
+    // way to know "the code exists, delivery just failed" versus "this
+    // request is broken." Converting it to ServiceUnavailableError (503,
+    // still >= 500 so errorHandler.ts logs it and reports it to the error
+    // tracker exactly as before) with the original error's message
+    // preserved in `details` keeps the real SMTP failure reason visible
+    // in server-side logs while giving the client an honest, specific
+    // status instead of an opaque crash.
+    try {
+      await this.notificationSender.send({
+        channel,
+        to: destination,
+        subject: copy.title,
+        body: `Your code to ${copy.label} is ${code}. It expires in ${Math.round(
+          this.config.otpTtlSeconds / 60,
+        )} minutes. Do not share it with anyone.`,
+      });
+    } catch (err) {
+      const cause = err instanceof Error ? err.message : String(err);
+      throw new ServiceUnavailableError(
+        `We couldn't send your verification code right now. Please try again in a moment.`,
+        { channel, cause },
+      );
+    }
 
     await this.notificationRepo.create({
       userId: user.id,

@@ -54,7 +54,10 @@ test("verify-otp rejects purpose=password_reset (must go through reset-password 
     () =>
       c.verifyOtp.execute({
         identifier: "guard@example.com",
-        // @ts-expect-error -- intentionally invalid purpose for this endpoint
+        // Note: "password_reset" is a valid OtpPurpose value at the type
+        // level (VerifyOtpInput reuses the full union), so this isn't a
+        // compile-time error -- the rejection below is a runtime guard in
+        // VerifyOtp.usecase.ts's ALLOWED_PURPOSES check, not the type system.
         purpose: "password_reset",
         code: "123456",
         device: TEST_DEVICE,
