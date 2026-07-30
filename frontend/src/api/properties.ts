@@ -2,6 +2,7 @@ import { httpClient } from "./httpClient";
 import {
   CreatePropertyPayload,
   PaginatedResult,
+  PlatformStats,
   PropertyCategory,
   PropertyDetail,
   PropertySummary,
@@ -15,6 +16,11 @@ export const propertiesApi = {
   // every time (Phase 5 Part 8: caching).
   categories: () =>
     httpClient.get<{ items: PropertyCategory[] }>("/properties/categories", undefined, false, 5 * 60 * 1000),
+
+  // Homepage "Platform Statistics" -- real aggregate counts only, safe to
+  // cache briefly like categories() above (these are slow-moving
+  // aggregates, not per-request-sensitive data).
+  stats: () => httpClient.get<PlatformStats>("/properties/stats", undefined, false, 5 * 60 * 1000),
 
   search: (filters: SearchFilters) =>
     httpClient.get<PaginatedResult<PropertySummary>>(

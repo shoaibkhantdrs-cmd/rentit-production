@@ -5,8 +5,11 @@ import {
   Building2,
   Eye,
   Home as HomeIcon,
+  LayoutGrid,
+  MessageCircle,
   Mic,
   MapPin,
+  Percent,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -23,6 +26,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Reveal } from "@/components/ui/Reveal";
 import { Carousel } from "@/components/ui/Carousel";
 import { AccordionItem } from "@/components/ui/Accordion";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { PropertyCategory, PropertySummary } from "@/api/types";
 
 const POPULAR_CITIES = ["Mumbai", "Pune", "Bengaluru", "Delhi", "Hyderabad", "Chennai"];
@@ -189,6 +193,7 @@ export function HomePage() {
 
   const newest = useAsync(() => propertiesApi.search({ sort: "newest", page: 1, pageSize: 8 }), []);
   const popular = useAsync(() => propertiesApi.search({ sort: "most_viewed", page: 1, pageSize: 8 }), []);
+  const platformStats = useAsync(() => propertiesApi.stats(), []);
   const recentlyViewed = useAsync(
     () => (isAuthenticated ? propertiesApi.recentlyViewed() : Promise.resolve({ items: [] })),
     [isAuthenticated],
@@ -473,22 +478,84 @@ export function HomePage() {
         </div>
       </Reveal>
 
-      {/* ---------- Stats (only real, fetched numbers -- no invented
-          "50,000 happy customers" style figures) ---------- */}
-      {newest.status === "success" ? (
+      {/* ---------- Platform Statistics (real, fetched aggregate numbers
+          only -- no invented "50,000 happy customers" style figures; see
+          GetPlatformStats.usecase.ts / PlatformStatsRepository.ts on the
+          backend for exactly how each count is computed, and
+          AnimatedNumber.tsx for why the count-up ticks on setInterval
+          rather than requestAnimationFrame or a CSS transition -- both of
+          those have already caused real stuck-forever bugs on this page).
+          Gated on its own fetch (not `newest`'s) so this section and the
+          "Newest listings" rail no longer depend on each other's success
+          to render. ---------- */}
+      {platformStats.status === "success" ? (
         <Reveal className="section-v2">
-          <div className="stats-v2">
-            <div className="stat-v2">
-              <div className="stat-v2__value">{newest.data.total.toLocaleString("en-IN")}+</div>
-              <div className="stat-v2__label">Live listings</div>
+          <div className="section-v2__header">
+            <div>
+              <h2 className="section-v2__title">Platform statistics</h2>
+              <p className="section-v2__subtitle">The real numbers behind RentIt, at a glance.</p>
             </div>
-            <div className="stat-v2">
-              <div className="stat-v2__value">{categories.length || "--"}</div>
-              <div className="stat-v2__label">Property categories</div>
+          </div>
+          <div className="stats-grid-v2">
+            <div className="stat-card-v2">
+              <span className="stat-card-v2__icon">
+                <Building2 size={22} />
+              </span>
+              <div className="stat-card-v2__value">
+                <AnimatedNumber value={platformStats.data.activeListings} suffix="+" />
+              </div>
+              <div className="stat-card-v2__label">Active Listings</div>
+              <p className="stat-card-v2__helper">Fresh listings added every day</p>
             </div>
-            <div className="stat-v2">
-              <div className="stat-v2__value">0%</div>
-              <div className="stat-v2__label">Brokerage fees</div>
+            <div className="stat-card-v2">
+              <span className="stat-card-v2__icon">
+                <ShieldCheck size={22} />
+              </span>
+              <div className="stat-card-v2__value">
+                <AnimatedNumber value={platformStats.data.verifiedOwners} />
+              </div>
+              <div className="stat-card-v2__label">Verified Owners</div>
+              <p className="stat-card-v2__helper">ID-checked before they can list</p>
+            </div>
+            <div className="stat-card-v2">
+              <span className="stat-card-v2__icon">
+                <MapPin size={22} />
+              </span>
+              <div className="stat-card-v2__value">
+                <AnimatedNumber value={platformStats.data.citiesCovered} />
+              </div>
+              <div className="stat-card-v2__label">Areas Covered</div>
+              <p className="stat-card-v2__helper">Across major Indian cities</p>
+            </div>
+            <div className="stat-card-v2">
+              <span className="stat-card-v2__icon">
+                <LayoutGrid size={22} />
+              </span>
+              <div className="stat-card-v2__value">
+                <AnimatedNumber value={platformStats.data.totalCategories} />
+              </div>
+              <div className="stat-card-v2__label">Property Categories</div>
+              <p className="stat-card-v2__helper">Apartments, villas, PGs & more</p>
+            </div>
+            <div className="stat-card-v2">
+              <span className="stat-card-v2__icon">
+                <MessageCircle size={22} />
+              </span>
+              <div className="stat-card-v2__value">
+                <AnimatedNumber value={24} suffix="/7" />
+              </div>
+              <div className="stat-card-v2__label">Customer Support</div>
+              <p className="stat-card-v2__helper">Real people, real fast</p>
+            </div>
+            <div className="stat-card-v2">
+              <span className="stat-card-v2__icon">
+                <Percent size={22} />
+              </span>
+              <div className="stat-card-v2__value">
+                <AnimatedNumber value={0} suffix="%" />
+              </div>
+              <div className="stat-card-v2__label">Brokerage Fees</div>
+              <p className="stat-card-v2__helper">Deal directly with owners</p>
             </div>
           </div>
         </Reveal>

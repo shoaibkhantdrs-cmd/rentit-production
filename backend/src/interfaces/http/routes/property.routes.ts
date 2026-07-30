@@ -46,6 +46,14 @@ export function createPropertyRouter(
   // safe to let a CDN/browser cache it for a few minutes.
   router.get("/categories", cacheControl(300), asyncHandler(controller.categories));
 
+  // Homepage "Platform Statistics" redesign: real aggregate counts only
+  // (active listings, categories, cities covered, verified owners), no
+  // invented figures. Public/no-auth, same route-ordering reason as
+  // "/mine", "/favorites", "/categories" above -- must come before
+  // "/:id". Short cache is safe: these are slow-moving aggregates, not
+  // per-request-sensitive data.
+  router.get("/stats", cacheControl(300), asyncHandler(controller.stats));
+
   // Phase 5 Parts 6-7 (Recently Viewed / Recommendations) -- same
   // route-ordering reason as /mine, /favorites, /categories above.
   router.get("/recently-viewed", authenticate, asyncHandler(controller.recentlyViewed));

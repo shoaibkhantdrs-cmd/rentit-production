@@ -64,6 +64,15 @@ export interface PropertyCategory {
   description: string | null;
 }
 
+/** Backs the public homepage "Platform Statistics" section -- real
+ * aggregate counts only (GET /properties/stats), no invented figures. */
+export interface PlatformStats {
+  activeListings: number;
+  totalCategories: number;
+  citiesCovered: number;
+  verifiedOwners: number;
+}
+
 export interface PropertySummary {
   id: string;
   title: string;

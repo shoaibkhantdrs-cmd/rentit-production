@@ -13,6 +13,7 @@ import { ReportPropertyUseCase } from "@/application/properties/ReportProperty.u
 import { GetMyPropertiesUseCase } from "@/application/properties/GetMyProperties.usecase";
 import { GetMyFavoritesUseCase } from "@/application/properties/GetMyFavorites.usecase";
 import { ListPropertyCategoriesUseCase } from "@/application/properties/ListPropertyCategories.usecase";
+import { GetPlatformStatsUseCase } from "@/application/properties/GetPlatformStats.usecase";
 import { GetRecentlyViewedUseCase } from "@/application/properties/GetRecentlyViewed.usecase";
 import { GetRecommendationsUseCase } from "@/application/properties/GetRecommendations.usecase";
 import { UnauthorizedError, ValidationError } from "@/domain/errors/AppError";
@@ -40,6 +41,7 @@ export class PropertyController {
     private readonly getMyProperties: GetMyPropertiesUseCase,
     private readonly getMyFavorites: GetMyFavoritesUseCase,
     private readonly listCategories: ListPropertyCategoriesUseCase,
+    private readonly getPlatformStats: GetPlatformStatsUseCase,
     private readonly getRecentlyViewed: GetRecentlyViewedUseCase,
     private readonly getRecommendations: GetRecommendationsUseCase,
   ) {}
@@ -185,6 +187,11 @@ export class PropertyController {
   categories = async (_req: Request, res: Response): Promise<void> => {
     const result = await this.listCategories.execute();
     res.status(200).json({ items: result });
+  };
+
+  stats = async (_req: Request, res: Response): Promise<void> => {
+    const result = await this.getPlatformStats.execute();
+    res.status(200).json(result);
   };
 
   recentlyViewed = async (req: Request, res: Response): Promise<void> => {
