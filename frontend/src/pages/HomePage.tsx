@@ -230,10 +230,16 @@ export function HomePage() {
   return (
     <div>
       {/* ---------- Hero + search ---------- */}
+      {/* Bug fix: same root cause as the page-transition wrapper in
+          Layout.tsx and Reveal.tsx -- this mount animation used to include
+          `opacity: 0 -> 1`, which live inspection caught frozen mid-tween
+          at a fractional value (e.g. 0.261993) with no guarantee of ever
+          completing. Dropped opacity from the animation entirely; only `y`
+          animates now, so this section can never render invisible/faded. */}
       <m.section
         className="hero-v2"
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ y: 16 }}
+        animate={{ y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
         <span className="hero-v2__eyebrow">

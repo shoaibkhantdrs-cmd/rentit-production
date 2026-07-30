@@ -200,17 +200,31 @@ export function Layout() {
 
       <main className="main-content" id="main-content" tabIndex={-1}>
         <div className="container-wide">
-          {/* Page transition -- a quick fade+rise keyed by pathname so
-              every route change (not just data loads within a page) feels
-              like part of one continuous, polished product rather than a
-              hard cut. Kept short (0.18s) so it never feels like it's in
-              the way of navigation. */}
+          {/* Bug fix (homepage UI bug report -- root cause, found after two
+              rounds of fixing the wrong component): this `m.div` wraps
+              EVERY routed page (Outlet), keyed by pathname, and used to
+              animate `opacity: 0 -> 1` on every route change. Live DevTools
+              inspection walked the full ancestor chain from the reported
+              "faded" stats section up through <body> and found this exact
+              element -- no className, so easy to miss -- frozen mid-tween
+              at a fractional opacity (e.g. 0.382693), four levels above
+              the stats section in the DOM. Its own child elements
+              (Reveal's section, .stats-v2) were correctly at opacity: 1 the
+              whole time; this ancestor's stuck opacity was multiplying
+              down and dimming everything under it on every page, which is
+              also why "Add to Home Screen" looked disabled -- it's fully
+              interactive, just visually dimmed by this same parent.
+              Same root cause, same fix as Reveal.tsx and the hero: don't
+              animate `opacity` on anything a stalled tween could leave
+              content stuck under. Page transitions now only animate `y`
+              (a subtle rise/fall), which can never hide or block a page's
+              content even if the transition never completes. */}
           <AnimatePresence mode="wait">
             <m.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              initial={{ y: 8 }}
+              animate={{ y: 0 }}
+              exit={{ y: -8 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
             >
               <Outlet />
