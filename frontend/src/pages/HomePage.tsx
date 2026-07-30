@@ -15,6 +15,7 @@ import {
 import { propertiesApi } from "@/api/properties";
 import { useAsync } from "@/hooks/useAsync";
 import { useAuth } from "@/context/AuthContext";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { PropertyCard } from "@/components/PropertyCard";
 import { PropertyGridSkeleton } from "@/components/Skeletons";
 import { EmptyState } from "@/components/EmptyState";
@@ -119,6 +120,7 @@ export function HomePage() {
   const searchFieldRef = useRef<HTMLDivElement | null>(null);
 
   const voice = useVoiceSearch((text) => setCity(text));
+  const pwaInstall = usePwaInstall();
 
   // Google-like instant suggestions -- rather than fabricating a city/
   // locality autocomplete list (no such endpoint exists on the backend),
@@ -499,9 +501,30 @@ export function HomePage() {
             </p>
           </div>
           <div className="download-app-v2__badges">
-            <span className="store-badge">
+            {/* Bug fix (homepage UI bug report): this was a static <span>
+                with no onClick and no wiring to the real `usePwaInstall`
+                hook -- it was styled with `cursor: pointer` to look like a
+                button but had zero interactivity, so it was permanently
+                "disabled" no matter what the browser supported. It's now a
+                real <button> that calls the same `promptInstall()` already
+                used correctly by PwaInstallBanner.tsx, and is only enabled
+                once the browser has actually fired `beforeinstallprompt`
+                (`pwaInstall.installable`) -- so it never claims to be
+                clickable when there's no real native prompt to show. */}
+            <button
+              type="button"
+              className="store-badge"
+              onClick={pwaInstall.promptInstall}
+              disabled={!pwaInstall.installable}
+              aria-disabled={!pwaInstall.installable}
+              title={
+                pwaInstall.installable
+                  ? "Install RentIt as an app"
+                  : "Install isn't available right now -- either RentIt is already installed, or your browser doesn't support installing it from this button."
+              }
+            >
               <Smartphone size={16} /> Add to Home Screen
-            </span>
+            </button>
           </div>
         </div>
       </Reveal>

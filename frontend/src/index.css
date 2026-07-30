@@ -2213,6 +2213,29 @@ textarea {
 
 /* ---------- Section shell ---------- */
 
+/* Bug fix (homepage UI bug report): CSS-transition-driven reveal to replace
+   the framer-motion whileInView tween that could freeze sections at a
+   partial/zero opacity forever if interrupted -- see Reveal.tsx for the
+   full root-cause writeup. A class-toggle transition always resolves to
+   its end state even if the animated frames themselves are skipped. */
+.reveal-v2 {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.45s ease-out, transform 0.45s ease-out;
+}
+
+.reveal-v2--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-v2 {
+    transition: none;
+    transform: none;
+  }
+}
+
 .section-v2 {
   margin-bottom: var(--space-8);
 }
@@ -3015,6 +3038,16 @@ textarea {
   font-weight: 700;
   font-size: 0.85rem;
   cursor: pointer;
+  /* Bug fix: now a real <button> (was a non-interactive <span> styled to
+     look like one) -- reset button chrome so it still looks identical. */
+  border: none;
+  font-family: inherit;
+  appearance: none;
+}
+
+.store-badge:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .footer-v2 {
