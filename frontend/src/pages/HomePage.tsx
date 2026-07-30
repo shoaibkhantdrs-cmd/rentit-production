@@ -501,30 +501,31 @@ export function HomePage() {
             </p>
           </div>
           <div className="download-app-v2__badges">
-            {/* Bug fix (homepage UI bug report): this was a static <span>
-                with no onClick and no wiring to the real `usePwaInstall`
-                hook -- it was styled with `cursor: pointer` to look like a
-                button but had zero interactivity, so it was permanently
-                "disabled" no matter what the browser supported. It's now a
-                real <button> that calls the same `promptInstall()` already
-                used correctly by PwaInstallBanner.tsx, and is only enabled
-                once the browser has actually fired `beforeinstallprompt`
-                (`pwaInstall.installable`) -- so it never claims to be
-                clickable when there's no real native prompt to show. */}
-            <button
-              type="button"
-              className="store-badge"
-              onClick={pwaInstall.promptInstall}
-              disabled={!pwaInstall.installable}
-              aria-disabled={!pwaInstall.installable}
-              title={
-                pwaInstall.installable
-                  ? "Install RentIt as an app"
-                  : "Install isn't available right now -- either RentIt is already installed, or your browser doesn't support installing it from this button."
-              }
-            >
-              <Smartphone size={16} /> Add to Home Screen
-            </button>
+            {/* Bug fix round 1: this was a static <span> with no onClick and
+                no wiring to the real `usePwaInstall` hook -- it was styled
+                with `cursor: pointer` to look like a button but had zero
+                interactivity. Round 1 made it a real <button>, but always
+                rendered (disabled unless installable) -- which meant most
+                visitors (anyone not on a Chromium browser mid-session that
+                already fired `beforeinstallprompt`, i.e. most people) saw a
+                permanently-greyed-out, dead-looking control, reported back
+                as "the button is rendered disabled".
+                Round 2 fix: follow this same file's own established
+                pattern for optional browser capabilities -- the voice
+                search mic button above (`voice.supported`) simply isn't
+                rendered at all when the browser can't support it, instead
+                of showing a broken/disabled affordance. Do the same here:
+                only render this control once `pwaInstall.installable` is
+                actually true (the browser really did fire
+                `beforeinstallprompt` and there's a real native prompt to
+                trigger). No installable prompt yet -- e.g. Firefox/Safari,
+                already installed, already dismissed, or criteria not met
+                yet -- means no button, not a dead one. */}
+            {pwaInstall.installable ? (
+              <button type="button" className="store-badge" onClick={pwaInstall.promptInstall} title="Install RentIt as an app">
+                <Smartphone size={16} /> Add to Home Screen
+              </button>
+            ) : null}
           </div>
         </div>
       </Reveal>

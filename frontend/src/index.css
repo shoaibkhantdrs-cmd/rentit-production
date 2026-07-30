@@ -2213,19 +2213,36 @@ textarea {
 
 /* ---------- Section shell ---------- */
 
-/* Bug fix (homepage UI bug report): CSS-transition-driven reveal to replace
-   the framer-motion whileInView tween that could freeze sections at a
-   partial/zero opacity forever if interrupted -- see Reveal.tsx for the
-   full root-cause writeup. A class-toggle transition always resolves to
-   its end state even if the animated frames themselves are skipped. */
+/* Bug fix round 2 (homepage UI bug report -- stats section still
+   permanently faded after the round-1 fix): round 1 replaced the
+   framer-motion `whileInView` tween with a CSS class-toggle transition on
+   `opacity`, on the theory that a class-toggle transition can't get stuck
+   the way a JS-interpolated one can. That was wrong. Live-inspected on the
+   deployed site again: the section's class list correctly included
+   `reveal-v2--visible`, but computed opacity was still `0` -- and forcing
+   `el.style.setProperty('opacity', '1', 'important')` directly on the
+   element did NOT change the computed value. That's the tell: per the CSS
+   Cascade spec, a *running* CSS Transition's current interpolated value
+   takes precedence over every other declaration for that property,
+   including inline `!important` -- transitions sit above even
+   author-!important in the origin/importance ordering. So whatever froze
+   this transition mid-flight (or before its first tick) left opacity
+   pinned at its start value with literally no CSS-only way to override it.
+   Conclusion: ANY animatable property that can hide content is a
+   liability if you can't guarantee its timeline completes, no matter
+   whether the animation engine is framer-motion or plain CSS. The fix is
+   to stop animating `opacity` here at all -- content is opacity: 1
+   unconditionally, always, full stop. Only `transform` (which never hides
+   or blocks content, at worst it's offset by a few px) is animated, so a
+   stalled transition can never again make a section unreadable or
+   unclickable. */
 .reveal-v2 {
-  opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.45s ease-out, transform 0.45s ease-out;
+  opacity: 1;
+  transform: translateY(16px);
+  transition: transform 0.45s ease-out;
 }
 
 .reveal-v2--visible {
-  opacity: 1;
   transform: translateY(0);
 }
 
@@ -3039,15 +3056,12 @@ textarea {
   font-size: 0.85rem;
   cursor: pointer;
   /* Bug fix: now a real <button> (was a non-interactive <span> styled to
-     look like one) -- reset button chrome so it still looks identical. */
+     look like one) -- reset button chrome so it still looks identical.
+     It's only ever rendered when installable (see HomePage.tsx), so no
+     disabled-state styling is needed here. */
   border: none;
   font-family: inherit;
   appearance: none;
-}
-
-.store-badge:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .footer-v2 {
