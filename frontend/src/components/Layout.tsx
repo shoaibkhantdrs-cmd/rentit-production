@@ -48,6 +48,21 @@ function NavItem({ to, children, icon }: { to: string; children: React.ReactNode
   );
 }
 
+// Design System v2 §9.3 ("one primary button per view") + the design
+// audit's nav finding: "List Property" is the single highest-value action
+// in the top nav (it drives owner supply), but previously rendered as a
+// plain .nav-v2__link with the exact same visual weight as Favorites or
+// Premium. This renders it as the nav's one Primary-styled CTA instead --
+// same NavLink behavior/active-state semantics, distinct styling.
+function NavCta({ to, children, icon }: { to: string; children: React.ReactNode; icon: React.ReactNode }) {
+  return (
+    <NavLink to={to} end className={({ isActive }) => `nav-v2__cta${isActive ? " nav-v2__cta--active" : ""}`}>
+      {icon}
+      {children}
+    </NavLink>
+  );
+}
+
 export function Layout() {
   const { isAuthenticated, user, logout } = useAuth();
   const { unreadCount } = useChat();
@@ -63,6 +78,19 @@ export function Layout() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Design System v2 §19 (focus/keyboard access is non-negotiable): the
+  // mobile nav panel previously closed only via the hamburger toggle or by
+  // navigating away -- Escape did nothing, unlike every other overlay in
+  // this app (Modal, Drawer, Popover all close on Escape).
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
 
   return (
     <div className="app-shell">
@@ -88,9 +116,6 @@ export function Layout() {
               <NavItem to="/search" icon={<SearchIcon size={15} />}>
                 Search
               </NavItem>
-              <NavItem to="/properties/new" icon={<PlusCircle size={15} />}>
-                List Property
-              </NavItem>
               <NavItem to="/my-properties" icon={<ListChecks size={15} />}>
                 My Properties
               </NavItem>
@@ -104,6 +129,10 @@ export function Layout() {
           </div>
 
           <div className="nav-v2__actions">
+            <NavCta to="/properties/new" icon={<PlusCircle size={15} />}>
+              List Property
+            </NavCta>
+
             <button
               type="button"
               className="nav-v2__icon-btn nav-v2__mobile-toggle"
@@ -143,7 +172,7 @@ export function Layout() {
                     aria-haspopup="menu"
                   >
                     <Avatar name={user?.name ?? "?"} size={30} />
-                    <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>{user?.name?.split(" ")[0]}</span>
+                    <span className="nav-v2__profile-name">{user?.name?.split(" ")[0]}</span>
                   </button>
                 )}
                 items={[
@@ -177,9 +206,9 @@ export function Layout() {
             <NavItem to="/search" icon={<SearchIcon size={15} />}>
               Search
             </NavItem>
-            <NavItem to="/properties/new" icon={<PlusCircle size={15} />}>
+            <NavCta to="/properties/new" icon={<PlusCircle size={15} />}>
               List Property
-            </NavItem>
+            </NavCta>
             <NavItem to="/my-properties" icon={<ListChecks size={15} />}>
               My Properties
             </NavItem>
@@ -243,9 +272,9 @@ export function Layout() {
         <BottomNavItem
           to="/messages"
           icon={
-            <span style={{ position: "relative" }}>
+            <span className="bottom-nav__icon-wrap">
               <MessageCircle size={20} />
-              {unreadCount > 0 ? <span className="unread-badge unread-badge--nav" style={{ top: -6, right: -8 }}>{unreadCount}</span> : null}
+              {unreadCount > 0 ? <span className="unread-badge unread-badge--bottom-nav">{unreadCount}</span> : null}
             </span>
           }
           label="Chat"

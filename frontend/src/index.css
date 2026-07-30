@@ -1808,6 +1808,20 @@ textarea {
   box-shadow: var(--shadow-xs);
 }
 
+/* Final design QA (pre-Phase-1-commit): the shared global :focus-visible
+   rule (further down this file) sets border-radius: 4px on every
+   focusable element -- correct for the app's rectangular controls, but it
+   has HIGHER specificity than this pill's own border-radius here (an
+   element+pseudo-class selector beats a single class), so tabbing to a
+   top-level nav link snapped its pill shape into a sharp corner for the
+   split second it's focused. Re-asserting the link's own resting shape
+   under :focus-visible keeps the ring reading as a highlight, not a
+   shape change -- exactly the kind of jarring, cheap-feeling moment
+   Design System v2 §19 and the "quiet confidence" principle rule out. */
+.nav-v2__link:focus-visible {
+  border-radius: var(--radius-pill);
+}
+
 .nav-v2__actions {
   display: flex;
   align-items: center;
@@ -1827,12 +1841,28 @@ textarea {
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
 .nav-v2__icon-btn:hover {
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+/* Design System v2 §0.1 #6 + §18: every interactive control gives tactile
+   press feedback, not just the .btn-v2 family -- icon-only nav controls
+   previously had a hover state but nothing on press, which reads as inert
+   rather than physical. */
+.nav-v2__icon-btn:active {
+  transform: scale(0.9);
+}
+
+/* Same fix as .nav-v2__link:focus-visible above: a plain <button> is
+   (0,1,0) specificity for its own border-radius, the shared global
+   button:focus-visible rule is (0,1,1) and wins, so this circular button
+   was flattening to a 4px corner square on keyboard focus. */
+.nav-v2__icon-btn:focus-visible {
+  border-radius: 50%;
 }
 
 .nav-v2__profile {
@@ -1844,11 +1874,95 @@ textarea {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   cursor: pointer;
-  transition: box-shadow var(--transition-fast);
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
 .nav-v2__profile:hover {
   box-shadow: var(--shadow-card);
+}
+
+.nav-v2__profile:active {
+  transform: scale(0.97);
+}
+
+/* Same fix as .nav-v2__link:focus-visible / .nav-v2__icon-btn:focus-visible
+   above: this is also a <button>, same specificity gap, same shape-pop
+   bug on keyboard focus otherwise. */
+.nav-v2__profile:focus-visible {
+  border-radius: var(--radius-pill);
+}
+
+.nav-v2__profile-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Design System v2 §9.3 (one primary button per view) + the design
+   audit's nav finding: "List Property" is the single highest-value action
+   in the top nav -- it drives owner supply -- so it gets the nav's one
+   Primary-styled treatment instead of blending into .nav-v2__links at the
+   same visual weight as Favorites/Premium. Sized between the pill nav
+   links and a full .btn-v2 so it reads as "the CTA in the nav," not a
+   second full-size button competing with the header itself. */
+.nav-v2__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.24);
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.nav-v2__cta:hover {
+  background: var(--color-primary-hover);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+}
+
+.nav-v2__cta:active {
+  transform: scale(0.96);
+}
+
+/* Same shape-pop bug as .nav-v2__link:focus-visible above -- this is
+   the nav's one Primary button, so a keyboard user landing on it and
+   seeing its pill snap into a corner square would be the single worst
+   place in the header for that flaw to show up. */
+.nav-v2__cta:focus-visible {
+  border-radius: var(--radius-pill);
+}
+
+/* Already on the destination route -- keep it looking like the CTA
+   (unlike .nav-v2__link--active, it doesn't need a distinct "active" look
+   since there's only ever one CTA; this just keeps the shadow from
+   looking identical to :hover when the route itself is current). */
+.nav-v2__cta--active {
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+@media (max-width: 960px) {
+  /* Final design QA (pre-Phase-1-commit) caught a real crowding bug: this
+     used to hide at 640px, a full 320px below the 960px breakpoint where
+     .nav-v2__center already collapses into the hamburger toggle. In that
+     641-959px gap (the exact width of a portrait tablet) the header still
+     had to fit the CTA *and* the hamburger toggle *and* every icon button
+     (theme, notifications, messages, admin) side by side with no
+     breathing room -- violating Design System v2 §0.1 #2 and risking
+     visual crowding right at a common device width. Hiding the CTA at the
+     same 960px breakpoint as the rest of the nav's collapse means the
+     header is only ever in one of two clean states: fully expanded
+     (>=960px, plenty of room for everything) or hamburger-driven (<960px,
+     where List Property already lives in the mobile panel below, styled
+     the same way -- see .nav-v2__mobile-panel .nav-v2__cta). Scoped to
+     .nav-v2__actions specifically so this doesn't also hide the mobile
+     panel's own CTA, which reuses the same base .nav-v2__cta class. */
+  .nav-v2__actions > .nav-v2__cta {
+    display: none;
+  }
 }
 
 .nav-v2__avatar {
@@ -1891,6 +2005,16 @@ textarea {
   justify-content: flex-start;
   width: 100%;
   border-radius: var(--radius-sm);
+}
+
+/* The CTA keeps its own pill shape and Primary fill even when stacked in
+   the mobile panel -- it's still the one highlighted action, just full-
+   width and with a little extra breathing room (Design System v2 §0.1 #2)
+   above/below so it doesn't blend into the plain-link stack around it. */
+.nav-v2__mobile-panel .nav-v2__cta {
+  justify-content: center;
+  width: 100%;
+  margin: 6px 0;
 }
 
 /* ---------- Buttons: premium additions (kept alongside .btn) ---------- */
@@ -4036,10 +4160,41 @@ textarea {
     text-decoration: none;
     padding: 4px 10px;
     border-radius: var(--radius-sm);
+    transition: color var(--transition-fast), transform var(--transition-fast);
   }
 
   .bottom-nav__item--active {
     color: var(--color-primary);
+  }
+
+  /* Design System v2 §0.1 #6 (tactile buttons) -- extends to the mobile
+     tab bar, which previously had no press feedback at all. */
+  .bottom-nav__item:active {
+    transform: scale(0.92);
+  }
+
+  /* Same specificity gap as .nav-v2__link:focus-visible above: this
+     item's own border-radius: var(--radius-sm) (10px) is a single class
+     selector, the shared global a:focus-visible rule (element+pseudo)
+     outranks it and forces a flat 4px on focus otherwise. */
+  .bottom-nav__item:focus-visible {
+    border-radius: var(--radius-sm);
+  }
+
+  /* Replaces an inline `style={{ position: "relative" }}` wrapper and an
+     inline `style={{ top: -6, right: -8 }}` badge offset in Layout.tsx --
+     Design System v2 §2.2/§4 ban hardcoded inline positioning in favor of
+     a named class, same treatment as .unread-badge--nav in the top nav. */
+  .bottom-nav__icon-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .unread-badge--bottom-nav {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    margin-left: 0;
   }
 
   /* Bug fix (QA report #17): the bottom-nav's own padding accounts for
@@ -4338,9 +4493,14 @@ textarea {
    the nav literally see-through at rest would show ordinary page
    background through it, not a hero image, which would look broken
    rather than premium. */
+/* Design System v2 §7 (Elevation): a sticky nav is Level 4 -- Overlay,
+   which calls for --shadow-xl once it's actually floating over scrolled
+   content, not the barely-there --shadow-xs this used before. The blur
+   radius is large/soft (per §6's "always soft, diffuse" rule) so it reads
+   as a gentle separation from the page, not a hard line. */
 .nav-v2--scrolled {
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-xl);
 }
 
 [data-theme="dark"] .nav-v2--scrolled {

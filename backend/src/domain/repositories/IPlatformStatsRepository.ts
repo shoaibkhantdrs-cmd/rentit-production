@@ -16,10 +16,15 @@ export interface PlatformStats {
   totalCategories: number;
   /** COUNT(DISTINCT city) among published properties' locations. */
   citiesCovered: number;
-  /** COUNT(DISTINCT user) with the property_owner role AND a completed
-   * identity verification (users.identity_verified_at IS NOT NULL) --
-   * the same "verified" signal ApproveIdentityVerification.usecase.ts
-   * already sets, not a separate/duplicated notion of "verified". */
+  /** COUNT(DISTINCT owner_id) of currently-published properties whose
+   * owner has completed identity verification
+   * (users.identity_verified_at IS NOT NULL -- the same "verified"
+   * signal ApproveIdentityVerification.usecase.ts already sets).
+   * Deliberately keyed off properties.owner_id, NOT the "property_owner"
+   * RBAC role: that role is a manually-granted permission flag (see
+   * UpdateUserRolesUseCase) that an admin/super_admin account creating a
+   * listing has no reason to ever hold, so counting by role undercounts
+   * real owners. This counts who actually owns a real, live listing. */
   verifiedOwners: number;
 }
 
