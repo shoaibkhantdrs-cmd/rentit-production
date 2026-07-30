@@ -2936,6 +2936,21 @@ textarea {
   padding: var(--space-7) var(--space-5);
 }
 
+/* Bug fix (dark-theme contrast): `background: var(--color-text)` was a
+   light-mode-only assumption -- --color-text is #0f172a (dark navy) in
+   light mode, so this read as an intentional dark inverted band with
+   white text. In dark mode --color-text flips to #e6e8eb (light, correct
+   for body copy on a dark page), so reusing it here put white text on a
+   near-white background: ~1.05:1 contrast, the reported "washed out"
+   look. Fix targets dark mode only -- light mode is untouched -- using
+   the same --color-surface/--color-text pairing every other dark-mode
+   card in this file already uses (see the ~40 other `background: var(
+   --color-surface)` rules), not a new or hardcoded color. */
+[data-theme="dark"] .stats-v2 {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
 .stat-v2 {
   text-align: center;
 }
@@ -3051,6 +3066,9 @@ textarea {
   background: var(--color-text);
   color: #fff;
   padding: 10px 18px;
+  /* Bug fix (dark-theme contrast): see the matching [data-theme="dark"]
+     override below and the identical comment on .stats-v2 above -- same
+     bug, same fix, same reused --color-surface/--color-text tokens. */
   border-radius: var(--radius-md);
   font-weight: 700;
   font-size: 0.85rem;
@@ -3062,6 +3080,11 @@ textarea {
   border: none;
   font-family: inherit;
   appearance: none;
+}
+
+[data-theme="dark"] .store-badge {
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .footer-v2 {
