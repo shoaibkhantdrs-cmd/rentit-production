@@ -2135,6 +2135,14 @@ textarea {
 
 /* ---------- Hero search ---------- */
 
+/* ---------- Phase 2 (Hero Section) -- Design System v2 ----------
+   Same bespoke gradient (kept from before this phase, three existing
+   hex stops -- a hero's own art-direction moment, same reasoning
+   Stripe/Linear/Airbnb hero sections use custom gradients distinct from
+   their flat UI accent color) now with a very slow animated position
+   drift ("subtle animated gradient", req #3) instead of a static fill.
+   No new colors introduced -- reuses the exact three stops that were
+   already here. */
 .hero-v2 {
   position: relative;
   border-radius: var(--radius-xl);
@@ -2153,12 +2161,103 @@ textarea {
   pointer-events: none;
 }
 
+/* Subtle animated gradient (req #3). Deliberately NOT an animated
+   background-position on .hero-v2 itself -- background-position is a
+   paint-triggering property, so animating it directly on the hero's
+   own (large) background would repaint that whole area every frame for
+   as long as the page stays open, which is exactly the kind of hidden
+   runtime cost "keep performance excellent" (req #17/Lighthouse) rules
+   out even though a single Lighthouse run wouldn't necessarily catch a
+   sustained repaint cost. Same fix as the orbs below: an oversized,
+   transform-only layer instead. transform/opacity are compositor-only
+   (GPU, no repaint), so this drifts "for free" no matter how long the
+   page is left open. Reuses the same blue/white rgba families already
+   in this hero, no new colors. */
+.hero-v2::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: linear-gradient(120deg, rgba(96, 165, 250, 0.35), transparent 40%, rgba(30, 58, 138, 0.32) 72%, transparent);
+  animation: hero-gradient-drift 22s ease-in-out infinite alternate;
+  pointer-events: none;
+  will-change: transform;
+}
+
+@keyframes hero-gradient-drift {
+  0% {
+    transform: translate3d(-3%, -2%, 0) rotate(0deg);
+  }
+  100% {
+    transform: translate3d(3%, 3%, 0) rotate(3deg);
+  }
+}
+
+/* Floating abstract shapes (req #4) -- "extremely slow motion" means
+   long durations (26s/32s) and small travel distances, so the motion
+   reads as ambient/alive rather than something a visitor would
+   consciously notice moving. Decorative only (aria-hidden in the JSX),
+   position: absolute so they never occupy layout flow (zero CLS risk),
+   contained by .hero-v2's own overflow: hidden (same containment the
+   existing ::before radial highlight already relies on). Reuses the
+   same white/blue rgba families already used elsewhere in this hero
+   (eyebrow, trending chips) rather than introducing new colors. */
+.hero-v2__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(50px);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.hero-v2__orb--a {
+  top: -80px;
+  right: -60px;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 70%);
+  animation: hero-orb-float-a 26s ease-in-out infinite alternate;
+}
+
+.hero-v2__orb--b {
+  bottom: -100px;
+  left: -40px;
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.35), transparent 70%);
+  animation: hero-orb-float-b 32s ease-in-out infinite alternate;
+}
+
+@keyframes hero-orb-float-a {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(-30px, 40px) scale(1.08);
+  }
+}
+
+@keyframes hero-orb-float-b {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(24px, -30px) scale(1.05);
+  }
+}
+
+/* Glassmorphism (req #5): backdrop-blur added on top of the existing
+   translucent fill -- was flat rgba color before, now genuinely reads
+   as glass sitting over the moving gradient/orbs behind it. */
 .hero-v2__eyebrow {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   background: rgba(255, 255, 255, 0.16);
   border: 1px solid rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   padding: 6px 14px;
   border-radius: var(--radius-pill);
   font-size: 0.78rem;
@@ -2167,6 +2266,8 @@ textarea {
 }
 
 .hero-v2__title {
+  position: relative;
+  z-index: 1;
   font-size: clamp(2rem, 4vw, 3.2rem);
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -2175,24 +2276,89 @@ textarea {
 }
 
 .hero-v2__subtitle {
+  position: relative;
+  z-index: 1;
   font-size: 1.05rem;
   opacity: 0.88;
   max-width: 52ch;
+  margin: 0 0 var(--space-5);
+}
+
+/* Trust-badge row (req #1): "verified owners / zero brokerage / search
+   in seconds" as three scannable glass pills, legible well within the
+   Design System's 5-second test, rather than relying on the visitor to
+   read the full subtitle sentence to find them. Same glass treatment as
+   the eyebrow above. */
+.hero-v2__trust-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 0 0 var(--space-6);
 }
 
+.hero-v2__trust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Search box as the primary visual focus (req #9): kept fully opaque
+   (unlike the glass eyebrow/badges/chips) so it stays the highest-
+   contrast, most legible element in the hero, and gains an extra
+   ambient glow layered onto the existing --shadow-xl elevation --
+   reuses the same rgba(37, 99, 235, ...) primary-blue tint already used
+   for CTA shadows elsewhere in this file, not a new color. */
 .search-bar-v2 {
   position: relative;
   z-index: 1;
   background: var(--color-surface);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-xl), 0 0 48px rgba(37, 99, 235, 0.28);
   padding: var(--space-2);
   display: grid;
   grid-template-columns: 1fr auto auto;
   gap: 6px;
   align-items: center;
   max-width: 780px;
+}
+
+/* Premium CTA sizing (req #10), scoped to the hero's own search
+   button only -- .btn-v2--primary itself (shared across the whole app:
+   forms, cards, wizards) is intentionally left untouched here, per this
+   phase's "Only Hero" scope. */
+.search-bar-v2__submit {
+  padding: 14px 28px;
+  font-size: 0.95rem;
+}
+
+/* Final design QA carried over from Phase 1: the same focus-visible
+   shape-pop bug (global 4px border-radius override beating a single
+   class's own radius on specificity) applies to every pill/circle
+   control in this hero too. Fixed on this phase's own new classes
+   directly, and scoped narrowly to the existing hero-only .btn-v2
+   instances by their specific modifier classes -- not by touching the
+   shared .btn-v2 rule itself. */
+.search-bar-v2__submit:focus-visible {
+  border-radius: var(--radius-pill);
+}
+
+.search-bar-v2__voice:focus-visible {
+  border-radius: 50%;
+}
+
+.search-suggest__item:focus-visible {
+  border-radius: var(--radius-md);
 }
 
 .search-bar-v2__field {
@@ -2315,6 +2481,35 @@ textarea {
   .search-bar-v2 {
     grid-template-columns: 1fr;
   }
+
+  /* Mobile-first pass (req: "Mobile-first" / "Responsive across every
+     screen"): the desktop padding (--space-8 --space-6 = 64px 32px) is
+     generous on a phone-width viewport where vertical space is scarce.
+     Tightened for small screens without touching the token values
+     themselves or any other section's spacing. */
+  .hero-v2 {
+    padding: var(--space-6) var(--space-4);
+  }
+
+  /* Static review caught this before any live check: at ~375px wide,
+     a 320px orb is nearly as wide as the whole hero -- still clipped
+     safely by overflow: hidden (no overflow/scroll risk either way),
+     but on a small screen it would compete with the text for attention
+     rather than sitting quietly behind it ("subtle", req #4). Scaled
+     down for small viewports only; desktop/tablet keep the full size. */
+  .hero-v2__orb--a {
+    width: 200px;
+    height: 200px;
+    top: -60px;
+    right: -50px;
+  }
+
+  .hero-v2__orb--b {
+    width: 160px;
+    height: 160px;
+    bottom: -70px;
+    left: -30px;
+  }
 }
 
 .trending-row {
@@ -2334,6 +2529,9 @@ textarea {
   margin-right: 4px;
 }
 
+/* Glassmorphism (req #5) + tactile press (Design System v2 §0.1 #6,
+   already applied to every other button in this app during Phase 1) --
+   these chips had a hover state but no :active feedback and no blur. */
 .trending-chip {
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -2343,11 +2541,23 @@ textarea {
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color var(--transition-fast);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .trending-chip:hover {
   background: rgba(255, 255, 255, 0.24);
+}
+
+.trending-chip:active {
+  transform: scale(0.95);
+}
+
+/* Same focus-visible shape-pop fix as Phase 1 (nav) and this hero's own
+   search button above. */
+.trending-chip:focus-visible {
+  border-radius: var(--radius-pill);
 }
 
 /* ---------- Section shell ---------- */

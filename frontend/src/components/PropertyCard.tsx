@@ -1,5 +1,5 @@
 import { memo, MouseEvent, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { m, PanInfo } from "framer-motion";
 import { Bath, BedDouble, Heart, MapPin, MessageCircle, Phone, Ruler, Scale, Share2, Images } from "lucide-react";
 import { PropertyDetail, PropertyStatus, PropertySummary } from "@/api/types";
@@ -46,6 +46,7 @@ interface PropertyCardProps {
 const MotionLink = m(Link);
 
 function PropertyCardImpl({ property, showStatus = true }: PropertyCardProps) {
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { isComparing, toggleCompare, canAddMore } = useCompare();
   const { showToast } = useToast();
@@ -140,8 +141,23 @@ function PropertyCardImpl({ property, showStatus = true }: PropertyCardProps) {
     <MotionLink
       to={`/properties/${property.id}`}
       className="property-card-v2"
-      initial={{ opacity: 0, y: 14 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      // Root cause (same failure class as CategoryStrip's cards on Home --
+      // see HomePage.tsx): opacity was gated on `whileInView`, which is
+      // driven by an internal IntersectionObserver with `viewport={{
+      // once: true }}`. If that observer never reports an intersection
+      // (or the `margin: "-40px"` root-margin shrink here made it even
+      // stricter than CategoryStrip's own trigger), `opacity: 0` from
+      // `initial` is the last value ever applied -- the card is fully
+      // present in the DOM, with real fetched data, but permanently
+      // invisible. This is every grid that renders PropertyCard (Home's
+      // Newest/Most Viewed/Recently Viewed/Near You rails, Search,
+      // Favorites, My Properties, Compare), not just one section. Fixed
+      // by applying Reveal.tsx's own already-proven remedy for this exact
+      // failure class: never gate opacity on a viewport/observer trigger.
+      // Only `y` animates now -- worst case a card sits 14px offset
+      // forever, never invisible.
+      initial={{ y: 14 }}
+      whileInView={{ y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       whileHover={{ y: -6 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
@@ -267,23 +283,45 @@ function PropertyCardImpl({ property, showStatus = true }: PropertyCardProps) {
               than exposing a phone number here: PropertySummary never
               includes owner contact info (by design, for privacy), and the
               real Contact Owner / WhatsApp flow already lives on
-              PropertyDetailsPage against real owner data. */}
-          <Link
-            to={`/properties/${property.id}#contact`}
+              PropertyDetailsPage against real owner data.
+
+              Bug fix (live browser evidence, 2026-07-31): these were both
+              `<Link>` -- real anchor elements -- rendered inside the
+              MotionLink/`<a>` that wraps the entire card. React logged a
+              real "validateDOMNesting: <a> cannot appear as a descendant
+              of <a>" warning once cards actually had data to render (the
+              warning was invisible while every grid was empty). Nested
+              anchors are invalid HTML and browsers silently drop the outer
+              anchor's semantics/reflow behavior. Converted to plain
+              buttons that call the exact same navigate(...) the Link
+              would have -- identical destination and click behavior,
+              just no nested <a>. */}
+          <button
+            type="button"
             className="icon-action"
             aria-label="Call owner"
             title="View details to call"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate(`/properties/${property.id}#contact`);
+            }}
           >
             <Phone size={15} />
-          </Link>
-          <Link
-            to={`/properties/${property.id}#contact`}
+          </button>
+          <button
+            type="button"
             className="icon-action icon-action--whatsapp"
             aria-label="Message owner on WhatsApp"
             title="View details to message on WhatsApp"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate(`/properties/${property.id}#contact`);
+            }}
           >
             <MessageCircle size={15} />
-          </Link>
+          </button>
         </div>
       </div>
     </MotionLink>

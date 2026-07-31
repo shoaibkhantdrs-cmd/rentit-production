@@ -77,7 +77,9 @@ function useVoiceSearch(onResult: (text: string) => void) {
 
 function CategoryStrip({ categories }: { categories: PropertyCategory[] }) {
   const navigate = useNavigate();
-  if (categories.length === 0) return null;
+  if (categories.length === 0) {
+    return null;
+  }
   return (
     <Reveal className="section-v2">
       <div className="section-v2__header">
@@ -88,6 +90,24 @@ function CategoryStrip({ categories }: { categories: PropertyCategory[] }) {
       </div>
       <div className="category-scroll">
         {categories.map((category, i) => (
+          // Root cause: this card previously animated `opacity: 0 -> 1` via
+          // `whileInView`, which is driven by an internal IntersectionObserver
+          // -- the exact same mechanism that already caused two confirmed,
+          // documented stuck-invisible incidents elsewhere in this app (see
+          // Reveal.tsx's own bug-fix history above). This strip has an added
+          // wrinkle Reveal's sections don't: .category-scroll is itself a
+          // horizontally-scrolling container, so a card's *horizontal*
+          // position inside that inner scroller can affect whether the
+          // browser ever reports it as "intersecting" -- if the observer
+          // never fires (or `viewport={{ once: true }}` latches onto a
+          // false read before the row's horizontal scroll position settles),
+          // `opacity: 0` from `initial` is the LAST value ever applied, and
+          // the card is invisible forever even though `categories` state is
+          // fully populated and this element is really in the DOM. This is
+          // fixed by applying Reveal.tsx's own already-proven remedy for
+          // this exact failure class: never gate opacity on a
+          // viewport/observer trigger. Only `y` animates now -- worst case
+          // a card sits 10px offset forever, never invisible.
           <m.button
             key={category.id}
             type="button"
@@ -95,8 +115,8 @@ function CategoryStrip({ categories }: { categories: PropertyCategory[] }) {
             onClick={() => navigate(`/search?category=${encodeURIComponent(category.slug)}`)}
             whileHover={{ y: -4 }}
             whileTap={{ scale: 0.96 }}
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ y: 10 }}
+            whileInView={{ y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.3, delay: i * 0.04 }}
           >
@@ -187,8 +207,12 @@ export function HomePage() {
   useEffect(() => {
     propertiesApi
       .categories()
-      .then((res) => setCategories(res.items))
-      .catch(() => setCategories([]));
+      .then((res) => {
+        setCategories(res.items);
+      })
+      .catch(() => {
+        setCategories([]);
+      });
   }, []);
 
   const newest = useAsync(() => propertiesApi.search({ sort: "newest", page: 1, pageSize: 8 }), []);
@@ -235,29 +259,89 @@ export function HomePage() {
   return (
     <div>
       {/* ---------- Hero + search ---------- */}
-      {/* Bug fix: same root cause as the page-transition wrapper in
-          Layout.tsx and Reveal.tsx -- this mount animation used to include
-          `opacity: 0 -> 1`, which live inspection caught frozen mid-tween
-          at a fractional value (e.g. 0.261993) with no guarantee of ever
-          completing. Dropped opacity from the animation entirely; only `y`
-          animates now, so this section can never render invisible/faded. */}
-      <m.section
-        className="hero-v2"
-        initial={{ y: 16 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <span className="hero-v2__eyebrow">
+      {/* Phase 2 (Hero Section, Design System v2): the original single
+          `m.section` wrapper animated only `y: 16 -> 0` on the whole block
+          at once -- safe (per the bug-fix note this replaces: an earlier
+          `opacity: 0 -> 1` mount tween on this exact page was once caught
+          frozen mid-transition at a fractional value like 0.261993), but
+          reads as one flat block move, not a "premium" cascading reveal.
+          This phase's brief explicitly asks for opacity again (reqs #7/#8:
+          "never opacity alone" / "use translate + blur + opacity
+          together"), so it's back -- but every element below combines it
+          with `y` and `filter: blur()` so a stalled tween's worst case is
+          "slightly faded, slightly blurred, slightly offset", never fully
+          invisible. This is also structurally different from the
+          historical bug: that stuck tween lived inside an AnimatePresence
+          `key={location.pathname}` remount (a new page mounting while the
+          old one was still exiting); nothing here remounts or re-keys
+          after the initial mount, so there's no competing tween to get
+          left mid-transition. Plain `initial`/`animate` (not `whileInView`)
+          is intentional too -- the hero is always above the fold on
+          mount, so there's no scroll-trigger uncertainty to add. Durations
+          are kept short (0.45-0.55s) and blur modest (6px) specifically so
+          this doesn't cost Lighthouse's LCP timing on the h1, which is the
+          hero's (and the page's) largest contentful element. */}
+      <section className="hero-v2">
+        <span className="hero-v2__orb hero-v2__orb--a" aria-hidden="true" />
+        <span className="hero-v2__orb hero-v2__orb--b" aria-hidden="true" />
+
+        <m.span
+          className="hero-v2__eyebrow"
+          initial={{ opacity: 0, y: 10, filter: "blur(6px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+        >
           <Sparkles size={14} />
           India's premium rental marketplace
-        </span>
-        <h1 className="hero-v2__title">Find your next place to rent, without the noise.</h1>
-        <p className="hero-v2__subtitle">
+        </m.span>
+
+        <m.h1
+          className="hero-v2__title"
+          initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.5, ease: "easeOut", delay: 0.06 }}
+        >
+          Find your next place to rent, without the noise.
+        </m.h1>
+
+        <m.p
+          className="hero-v2__subtitle"
+          initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.5, ease: "easeOut", delay: 0.12 }}
+        >
           Verified listings, direct owner contact, and zero brokerage games. Search apartments, houses,
           PGs, and commercial spaces across every major city.
-        </p>
+        </m.p>
 
-        <form className="search-bar-v2" onSubmit={handleSearch}>
+        {/* Trust row (req #1): "verified owners / zero brokerage / search
+            in seconds" as three immediately scannable badges -- the
+            Design System's 5-second test shouldn't depend on a visitor
+            reading the full subtitle sentence to find these. */}
+        <m.div
+          className="hero-v2__trust-row"
+          initial={{ opacity: 0, y: 12, filter: "blur(6px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.5, ease: "easeOut", delay: 0.18 }}
+        >
+          <span className="hero-v2__trust-badge">
+            <ShieldCheck size={14} /> Verified owners
+          </span>
+          <span className="hero-v2__trust-badge">
+            <Percent size={14} /> Zero brokerage
+          </span>
+          <span className="hero-v2__trust-badge">
+            <Sparkles size={14} /> Search in seconds
+          </span>
+        </m.div>
+
+        <m.form
+          className="search-bar-v2"
+          onSubmit={handleSearch}
+          initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.55, ease: "easeOut", delay: 0.24 }}
+        >
           <div className="search-bar-v2__field-wrap" ref={searchFieldRef}>
             <label className="search-bar-v2__field" htmlFor="hero-city">
               <MapPin size={18} />
@@ -325,20 +409,25 @@ export function HomePage() {
               <Mic size={18} />
             </button>
           ) : null}
-          <button type="submit" className="btn-v2 btn-v2--primary">
+          <button type="submit" className="btn-v2 btn-v2--primary search-bar-v2__submit">
             Search
           </button>
-        </form>
+        </m.form>
 
-        <div className="trending-row">
+        <m.div
+          className="trending-row"
+          initial={{ opacity: 0, y: 10, filter: "blur(6px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.5, ease: "easeOut", delay: 0.3 }}
+        >
           <span className="trending-row__label">Popular searches:</span>
           {POPULAR_CITIES.map((c) => (
             <button key={c} type="button" className="trending-chip" onClick={() => navigate(`/search?city=${encodeURIComponent(c)}`)}>
               {c}
             </button>
           ))}
-        </div>
-      </m.section>
+        </m.div>
+      </section>
 
       <CategoryStrip categories={categories} />
 

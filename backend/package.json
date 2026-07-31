@@ -24,7 +24,10 @@
     "backup:db": "bash scripts/backup-db.sh",
     "restore:db": "bash scripts/restore-db.sh",
     "test:smtp": "tsx scripts/test-smtp.ts",
-    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts"
+    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
+    "db:audit:properties": "tsx scripts/audit-properties.ts",
+    "db:seed:properties": "tsx scripts/seed-properties.ts",
+    "db:cleanup:seed-marker": "tsx scripts/cleanup-seed-marker.ts"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

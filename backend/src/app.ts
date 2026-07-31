@@ -31,7 +31,42 @@ export function createApp(): { app: express.Express; container: Container } {
   app.set("trust proxy", 1);
 
   app.use(helmet());
-  app.use(cors({ origin: env.corsOrigin }));
+  // Root cause (confirmed with live browser evidence -- frontend on
+  // :5177, backend only allowlisting 5173/5174, browser console showing
+  // the CORS block directly): the static env.corsOrigin allowlist only
+  // ever covered 5173/5174, and Vite has no upper bound on which port it
+  // falls forward to when lower ones are already taken. These are plain
+  // unauthenticated GETs with no custom headers, so the browser doesn't
+  // even send a CORS preflight -- it sends the real request straight
+  // through, the server actually receives and answers it (which is why
+  // curl/Postman/the Network tab all correctly show a real 200), but the
+  // response has no matching Access-Control-Allow-Origin for :5177, so
+  // the browser blocks the page's JS from reading that response and
+  // fetch() rejects. Production is completely unaffected: this branches
+  // on env.isProduction, and production keeps using the exact same
+  // static env.corsOrigin array as before, sourced from the real
+  // CORS_ORIGIN env var. Development only additionally accepts any
+  // http(s)://localhost:<port> or 127.0.0.1:<port> origin, so this never
+  // goes stale again the next time a lower port is busy.
+  app.use(
+    cors({
+      origin: env.isProduction
+        ? env.corsOrigin
+        : (origin, callback) => {
+            // No Origin header -- same-origin requests, curl, Postman,
+            // server-to-server calls, mobile apps. Never subject to a
+            // browser CORS check in the first place, so always allow.
+            if (!origin) return callback(null, true);
+
+            const isLocalDevOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+            if (isLocalDevOrigin || env.corsOrigin.includes(origin)) {
+              return callback(null, true);
+            }
+
+            callback(new Error(`Not allowed by CORS: ${origin}`));
+          },
+    }),
+  );
   // Phase 6 Part 3 (performance): compress every JSON response above a
   // small size threshold. Placed before the body parser since it only
   // wraps the outgoing response, not the incoming request.
