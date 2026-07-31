@@ -14,7 +14,6 @@ import { createErrorHandler } from "@/interfaces/http/middleware/errorHandler";
 import { compression } from "@/interfaces/http/middleware/compression";
 import { metricsMiddleware } from "@/infrastructure/observability/metrics";
 import { metricsRouter } from "@/interfaces/http/routes/metrics.routes";
-import { tempSeedTriggerRouter } from "@/interfaces/http/routes/tempSeedTrigger.routes";
 
 /**
  * Returns the container alongside the Express app (rather than just the
@@ -117,10 +116,6 @@ export function createApp(): { app: express.Express; container: Container } {
   // route so a Prometheus scrape config can point at one fixed path
   // regardless of how the rest of the API is versioned/restructured.
   app.use("/metrics", metricsRouter);
-  // TEMPORARY -- see tempSeedTrigger.routes.ts doc comment. Remove this
-  // line and delete that file once the one-time production seed run is
-  // confirmed successful.
-  app.use("/internal/seed-properties-once", tempSeedTriggerRouter);
 app.get("/", (_req, res) => {
   res.json({
     service: "RentIt Backend",
