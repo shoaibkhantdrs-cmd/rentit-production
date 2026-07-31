@@ -260,10 +260,22 @@ function PropertyWizard() {
             <div className="field">
               <label htmlFor="w-title">Title</label>
               <input id="w-title" required minLength={5} maxLength={200} disabled={locked} value={values.title} onChange={(e) => update("title", e.target.value)} />
+              {/* Bug fix: stepValid (below) silently requires title.trim() >= 5
+                  chars before Next enables, but nothing on screen said so --
+                  the HTML `required`/`minLength` attributes above never
+                  surface native validation because Next is a plain button,
+                  not a form submit. Reusing the same field-error pattern
+                  already used for categoriesError just above. */}
+              {!locked && values.title.trim().length > 0 && values.title.trim().length < 5 ? (
+                <span className="field-error">Title must be at least 5 characters ({values.title.trim().length}/5).</span>
+              ) : null}
             </div>
             <div className="field">
               <label htmlFor="w-description">Description</label>
               <textarea id="w-description" required minLength={20} maxLength={5000} disabled={locked} value={values.description} onChange={(e) => update("description", e.target.value)} />
+              {!locked && values.description.trim().length > 0 && values.description.trim().length < 20 ? (
+                <span className="field-error">Description must be at least 20 characters ({values.description.trim().length}/20).</span>
+              ) : null}
             </div>
             <div className="form-grid">
               <div className="field">
