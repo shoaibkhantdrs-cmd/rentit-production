@@ -88,6 +88,7 @@ import { DevAutoLoginUseCase } from "@/application/auth/DevAutoLogin.usecase";
 import { GetMeUseCase } from "@/application/users/GetMe.usecase";
 import { UpdateMeUseCase } from "@/application/users/UpdateMe.usecase";
 import { DeleteMeUseCase } from "@/application/users/DeleteMe.usecase";
+import { RequestPhoneOtpUseCase } from "@/application/users/RequestPhoneOtp.usecase";
 import { ListNotificationsUseCase } from "@/application/notifications/ListNotifications.usecase";
 import { MarkNotificationsReadUseCase } from "@/application/notifications/MarkNotificationsRead.usecase";
 import { PropertyDetailLoader } from "@/application/properties/shared/PropertyDetailLoader";
@@ -430,6 +431,7 @@ export function buildContainer() {
     otpIssuer,
   );
   const deleteMe = new DeleteMeUseCase(userRepo, refreshTokenRepo, sessionRepo, auditLogRepo);
+  const requestPhoneOtp = new RequestPhoneOtpUseCase(userRepo, otpIssuer);
 
   const listNotifications = new ListNotificationsUseCase(notificationRepo);
   const markNotificationsRead = new MarkNotificationsReadUseCase(notificationRepo, activityLogRepo);
@@ -768,7 +770,7 @@ export function buildContainer() {
     resetPassword,
     devAutoLogin,
   );
-  const userController = new UserController(getMe, updateMe, deleteMe, reportUser);
+  const userController = new UserController(getMe, updateMe, deleteMe, reportUser, requestPhoneOtp);
   const notificationController = new NotificationController(
     listNotifications,
     markNotificationsRead,

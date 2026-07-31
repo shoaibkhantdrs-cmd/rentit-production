@@ -46,7 +46,10 @@ export function createApiRouter(deps: ApiRouterDeps): Router {
 
   router.use("/health", healthRouter);
   router.use("/auth", createAuthRouter(deps.authController, deps.authenticate, deps.authRateLimiter));
-  router.use("/users", createUserRouter(deps.userController, deps.authenticate));
+  router.use(
+    "/users",
+    createUserRouter(deps.userController, deps.authenticate, deps.messagingRateLimiter),
+  );
   router.use(
     "/notifications",
     createNotificationRouter(deps.notificationController, deps.authenticate),

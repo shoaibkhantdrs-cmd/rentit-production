@@ -22,6 +22,10 @@ export class GetMyVerificationStatusUseCase {
     return {
       emailVerified: user.emailVerifiedAt !== null,
       phoneVerified: user.phoneVerifiedAt !== null,
+      // Additive: lets the Verification page show "Verified on <date>"
+      // instead of just a checkmark, without changing the two existing
+      // boolean fields above.
+      phoneVerifiedAt: user.phoneVerifiedAt,
       identityVerified: user.identityVerifiedAt !== null,
       identityVerification: latest,
     };
