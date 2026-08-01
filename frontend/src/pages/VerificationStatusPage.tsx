@@ -1,10 +1,15 @@
 import { FormEvent, useState } from "react";
+import { Link } from "react-router-dom";
 import { verificationApi } from "@/api/verification";
 import { useAsync } from "@/hooks/useAsync";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ErrorState } from "@/components/ErrorState";
 import { ApiError } from "@/api/httpClient";
 import { IdentityDocumentType } from "@/api/types";
+
+function formatVerifiedDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+}
 
 const DOCUMENT_TYPES: Array<{ value: IdentityDocumentType; label: string }> = [
   { value: "government_id", label: "Government ID" },
@@ -59,6 +64,16 @@ function VerificationStatusContent() {
         <div className="detail-stat">
           <div className="detail-stat__value">{data.phoneVerified ? "✅" : "—"}</div>
           <div className="detail-stat__label">Phone</div>
+          {data.phoneVerified && data.phoneVerifiedAt ? (
+            <div className="field-hint" style={{ marginTop: 4 }}>
+              Verified on: {formatVerifiedDate(data.phoneVerifiedAt)}
+            </div>
+          ) : (
+            <div className="field-hint" style={{ marginTop: 4 }}>
+              Pending —{" "}
+              <Link to="/profile">add &amp; verify in Contact Information</Link>
+            </div>
+          )}
         </div>
         <div className="detail-stat">
           <div className="detail-stat__value">{data.identityVerified ? "✅" : "—"}</div>

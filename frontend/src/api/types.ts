@@ -140,7 +140,17 @@ export interface PropertyDetail {
   createdAt: string;
   updatedAt: string;
   category: { id: string; name: string; slug: string } | null;
-  owner: { id: string; name: string } | null;
+  owner: {
+    id: string;
+    name: string;
+    identityVerified: boolean;
+    /** e.g. "+91 98XXXX3210" -- safe to show to anonymous visitors. */
+    maskedPhone: string | null;
+    /** Only present when the viewer is authenticated; digits with country code, e.g. "919876543210". */
+    phone: string | null;
+    /** Only present when the viewer is authenticated. */
+    email: string | null;
+  } | null;
   location: PropertyLocationDTO | null;
   images: PropertyImageDTO[];
   features: string[];
@@ -395,6 +405,8 @@ export interface IdentityVerificationRecord {
 export interface MyVerificationStatus {
   emailVerified: boolean;
   phoneVerified: boolean;
+  /** Null until phoneVerified is true. */
+  phoneVerifiedAt: string | null;
   identityVerified: boolean;
   identityVerification: IdentityVerificationRecord | null;
 }

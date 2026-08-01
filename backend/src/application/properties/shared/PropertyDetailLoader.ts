@@ -13,6 +13,30 @@ import { IPropertyFavoriteRepository } from "@/domain/repositories/IPropertyFavo
 import { PropertyDetailDTO } from "./PropertyDetailDTO";
 
 /**
+ * Stored phones aren't guaranteed to include a leading "+"/country code --
+ * auth.schemas.ts/user.schemas.ts both accept `/^\+?[1-9]\d{7,14}$/`, so a
+ * user may have saved a bare national number. This platform is India-only
+ * in practice (seed data, Nominatim, INR pricing throughout), so a bare
+ * 10-digit number is assumed to be missing its "91" prefix; anything
+ * already longer is assumed to already include a country code. Returns
+ * digits only, no "+"/spaces, e.g. "919876543210".
+ */
+function normalizePhone(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 10) return null; // too short to be a real number
+  return digits.length === 10 ? `91${digits}` : digits;
+}
+
+/** "+91 98XXXX3210" -- country code, first 2 and last 4 digits of the national number visible, the middle 4 masked. Safe to show to anonymous visitors. */
+function maskPhone(raw: string): string | null {
+  const normalized = normalizePhone(raw);
+  if (!normalized) return null;
+  const countryCode = normalized.slice(0, -10);
+  const national = normalized.slice(-10);
+  return `+${countryCode} ${national.slice(0, 2)}XXXX${national.slice(6)}`;
+}
+
+/**
  * Gathers every related piece of a single property (category, owner,
  * location, images, features, favorited-by-viewer) and shapes it into the
  * DTO returned by create/get/update/mine. Deliberately not used by search
@@ -39,7 +63,7 @@ export class PropertyDetailLoader {
       viewerUserId ? this.favoriteRepo.exists(property.id, viewerUserId) : Promise.resolve(null),
     ]);
 
-    return this.assemble(property, category, owner, location, images, features, isFavorited);
+    return this.assemble(property, category, owner, location, images, features, isFavorited, viewerUserId);
   }
 
   /**
@@ -101,6 +125,7 @@ export class PropertyDetailLoader {
         imagesByPropertyId.get(property.id) ?? [],
         featuresByPropertyId.get(property.id) ?? [],
         favoritedSet ? favoritedSet.has(property.id) : null,
+        viewerUserId,
       ),
     );
   }
@@ -113,6 +138,7 @@ export class PropertyDetailLoader {
     images: PropertyImage[],
     features: PropertyFeature[],
     isFavorited: boolean | null,
+    viewerUserId?: string | null,
   ): PropertyDetailDTO {
     return {
       id: property.id,
@@ -137,7 +163,20 @@ export class PropertyDetailLoader {
       createdAt: property.createdAt,
       updatedAt: property.updatedAt,
       category: category ? { id: category.id, name: category.name, slug: category.slug } : null,
-      owner: owner ? { id: owner.id, name: owner.name } : null,
+      owner: owner
+        ? {
+            id: owner.id,
+            name: owner.name,
+            identityVerified: owner.identityVerifiedAt !== null,
+            maskedPhone: owner.phone ? maskPhone(owner.phone) : null,
+            // Full phone/email only ever populated for an authenticated
+            // viewer -- anonymous requests get maskedPhone only, never the
+            // real number or email, regardless of what the frontend does
+            // with it.
+            phone: viewerUserId && owner.phone ? normalizePhone(owner.phone) : null,
+            email: viewerUserId ? owner.email : null,
+          }
+        : null,
       location: location
         ? {
             addressLine: location.addressLine,
