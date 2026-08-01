@@ -38,6 +38,16 @@ if (nodeEnv !== "development" && !process.env.JWT_ACCESS_SECRET) {
 export const env = {
   nodeEnv,
   isProduction,
+  // Dedicated override for OtpIssuer's SMS bypass (see AuthConfig.devOtpMode
+  // and OtpIssuer.ts) -- deliberately NOT derived from isProduction/nodeEnv.
+  // Render sets NODE_ENV=production on deployed web services regardless of
+  // whether a real, DLT-registered Twilio account is configured, so an
+  // isProduction-based check stayed permanently on the "call Twilio" branch
+  // in the one environment (this Render deployment, no DLT registration
+  // yet) where the bypass was actually needed. This flag is opt-in and
+  // false by default, so a normal production deploy with a real Twilio
+  // account is completely unaffected unless someone explicitly sets it.
+  devOtpMode: process.env.DEV_OTP_MODE === "true",
   port: int("PORT", 4000),
   databaseUrl: required(
     "DATABASE_URL",

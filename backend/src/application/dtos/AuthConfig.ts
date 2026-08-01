@@ -4,9 +4,13 @@ export interface AuthConfig {
   otpLength: number;
   otpTtlSeconds: number;
   otpMaxAttempts: number;
-  /** When false (any non-production NODE_ENV), OtpIssuer skips the real SMS
-   * provider for phone_verification codes and returns the plaintext code to
-   * the caller instead -- see OtpIssuer.issue(). Email OTP delivery is
-   * unaffected in either environment. */
-  isProduction: boolean;
+  /** When true, OtpIssuer skips the real SMS provider for phone_verification
+   * codes and returns the plaintext code to the caller instead -- see
+   * OtpIssuer.issue(). Sourced from the dedicated DEV_OTP_MODE env var
+   * (config/env.ts), not NODE_ENV -- Render sets NODE_ENV=production on
+   * every deployed web service regardless of whether a real Twilio account
+   * is configured, so an isProduction-based check never bypassed Twilio on
+   * this deployment. Email OTP delivery (login/email_verification/
+   * password_reset) is unaffected regardless of this flag. */
+  devOtpMode: boolean;
 }

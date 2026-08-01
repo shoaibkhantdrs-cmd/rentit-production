@@ -63,17 +63,21 @@ export class OtpIssuer {
 
     const copy = PURPOSE_COPY[purpose];
 
-    // Development mode has no SMS provider wired up on purpose (no Twilio
-    // trial account can send arbitrary-content SMS to India without DLT
-    // template registration -- see the phone-verification debugging
-    // session). Generation, hashing, storage, expiry, and verification
-    // above/below are completely unchanged; only the "sms" channel's
-    // delivery step is skipped outside production, in favor of handing the
-    // plaintext code straight back to the caller and logging it, so the
-    // rest of the flow stays fully testable without a real SMS provider.
-    // Email OTP delivery (login/email_verification/password_reset) is
-    // unaffected in every environment.
-    const isDevSmsBypass = channel === "sms" && !this.config.isProduction;
+    // Dev-mode SMS bypass, gated on the dedicated DEV_OTP_MODE env var
+    // (AuthConfig.devOtpMode) -- deliberately NOT on isProduction/NODE_ENV.
+    // Render sets NODE_ENV=production on this deployed web service
+    // regardless of whether a real, DLT-registered Twilio account is
+    // configured, so an isProduction-based version of this check never
+    // actually took the bypass branch here -- every "Verify Phone" click
+    // still called Twilio and hit the same 572006 trial/DLT rejection.
+    // Generation, hashing, storage, expiry, and verification above/below
+    // are completely unchanged; only the "sms" channel's delivery step is
+    // skipped when devOtpMode is true, in favor of handing the plaintext
+    // code straight back to the caller and logging it, so the rest of the
+    // flow stays fully testable without a real SMS provider. Email OTP
+    // delivery (login/email_verification/password_reset) is unaffected
+    // regardless of this flag.
+    const isDevSmsBypass = channel === "sms" && this.config.devOtpMode;
 
     if (isDevSmsBypass) {
       // eslint-disable-next-line no-console -- intentional: explicit dev-mode OTP visibility, not app logging
