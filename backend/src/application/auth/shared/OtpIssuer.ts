@@ -32,7 +32,13 @@ export class OtpIssuer {
     private readonly config: AuthConfig,
   ) {}
 
-  async issue(user: User, purpose: OtpPurpose): Promise<void> {
+  /**
+   * Returns `{ devOtp }` -- `devOtp` is only ever populated for the
+   * dev-mode SMS bypass below (see isDevSmsBypass); every other path
+   * returns `{}` and callers that don't care (login/register/forgot-
+   * password, all email channel) can ignore the result exactly as before.
+   */
+  async issue(user: User, purpose: OtpPurpose): Promise<{ devOtp?: string }> {
     const channel = purpose === "phone_verification" ? "sms" : "email";
     const destination = channel === "email" ? user.email : user.phone;
 
@@ -57,36 +63,53 @@ export class OtpIssuer {
 
     const copy = PURPOSE_COPY[purpose];
 
-    // Bug fix: this call previously had no error handling at all. A
-    // downstream delivery failure (wrong SMTP port/TLS mode, bad Gmail
-    // App Password, DNS/network issue reaching the SMTP host, etc.) threw
-    // a plain, unclassified Error straight out of SmtpClient -- which
-    // propagated uncaught all the way to errorHandler.ts's generic 500
-    // branch ("Something went wrong"), even though the OTP row above had
-    // already been written successfully. That's indistinguishable from an
-    // actual application bug in logs/monitoring and gives the caller no
-    // way to know "the code exists, delivery just failed" versus "this
-    // request is broken." Converting it to ServiceUnavailableError (503,
-    // still >= 500 so errorHandler.ts logs it and reports it to the error
-    // tracker exactly as before) with the original error's message
-    // preserved in `details` keeps the real SMTP failure reason visible
-    // in server-side logs while giving the client an honest, specific
-    // status instead of an opaque crash.
-    try {
-      await this.notificationSender.send({
-        channel,
-        to: destination,
-        subject: copy.title,
-        body: `Your code to ${copy.label} is ${code}. It expires in ${Math.round(
-          this.config.otpTtlSeconds / 60,
-        )} minutes. Do not share it with anyone.`,
-      });
-    } catch (err) {
-      const cause = err instanceof Error ? err.message : String(err);
-      throw new ServiceUnavailableError(
-        `We couldn't send your verification code right now. Please try again in a moment.`,
-        { channel, cause },
-      );
+    // Development mode has no SMS provider wired up on purpose (no Twilio
+    // trial account can send arbitrary-content SMS to India without DLT
+    // template registration -- see the phone-verification debugging
+    // session). Generation, hashing, storage, expiry, and verification
+    // above/below are completely unchanged; only the "sms" channel's
+    // delivery step is skipped outside production, in favor of handing the
+    // plaintext code straight back to the caller and logging it, so the
+    // rest of the flow stays fully testable without a real SMS provider.
+    // Email OTP delivery (login/email_verification/password_reset) is
+    // unaffected in every environment.
+    const isDevSmsBypass = channel === "sms" && !this.config.isProduction;
+
+    if (isDevSmsBypass) {
+      // eslint-disable-next-line no-console -- intentional: explicit dev-mode OTP visibility, not app logging
+      console.log(`[DEV OTP] ${purpose} code for user ${user.id} (${destination}): ${code}`);
+    } else {
+      // Bug fix: this call previously had no error handling at all. A
+      // downstream delivery failure (wrong SMTP port/TLS mode, bad Gmail
+      // App Password, DNS/network issue reaching the SMTP host, etc.) threw
+      // a plain, unclassified Error straight out of SmtpClient -- which
+      // propagated uncaught all the way to errorHandler.ts's generic 500
+      // branch ("Something went wrong"), even though the OTP row above had
+      // already been written successfully. That's indistinguishable from an
+      // actual application bug in logs/monitoring and gives the caller no
+      // way to know "the code exists, delivery just failed" versus "this
+      // request is broken." Converting it to ServiceUnavailableError (503,
+      // still >= 500 so errorHandler.ts logs it and reports it to the error
+      // tracker exactly as before) with the original error's message
+      // preserved in `details` keeps the real SMTP/SMS failure reason
+      // visible in server-side logs while giving the client an honest,
+      // specific status instead of an opaque crash.
+      try {
+        await this.notificationSender.send({
+          channel,
+          to: destination,
+          subject: copy.title,
+          body: `Your code to ${copy.label} is ${code}. It expires in ${Math.round(
+            this.config.otpTtlSeconds / 60,
+          )} minutes. Do not share it with anyone.`,
+        });
+      } catch (err) {
+        const cause = err instanceof Error ? err.message : String(err);
+        throw new ServiceUnavailableError(
+          `We couldn't send your verification code right now. Please try again in a moment.`,
+          { channel, cause },
+        );
+      }
     }
 
     await this.notificationRepo.create({
@@ -96,5 +119,7 @@ export class OtpIssuer {
       body: `We sent a code to your ${channel === "email" ? "email" : "phone"} to ${copy.label}.`,
       data: { purpose, channel },
     });
+
+    return isDevSmsBypass ? { devOtp: code } : {};
   }
 }

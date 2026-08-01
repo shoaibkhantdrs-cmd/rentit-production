@@ -54,7 +54,14 @@ export class UserController {
    * (see RequestPhoneOtpUseCase's doc comment). */
   requestPhoneOtpHandler = async (req: Request, res: Response): Promise<void> => {
     if (!req.user) throw new UnauthorizedError();
-    await this.requestPhoneOtp.execute({ userId: req.user.sub });
-    res.status(200).json({ message: "Verification code sent to your phone." });
+    const { devOtp } = await this.requestPhoneOtp.execute({ userId: req.user.sub });
+    // devOtp is only ever set outside production (see OtpIssuer's
+    // isDevSmsBypass) -- no real SMS provider is called in that case, so the
+    // code is returned here instead of being delivered.
+    if (devOtp) {
+      res.status(200).json({ message: "OTP generated (development mode)", otp: devOtp });
+    } else {
+      res.status(200).json({ message: "Verification code sent to your phone." });
+    }
   };
 }

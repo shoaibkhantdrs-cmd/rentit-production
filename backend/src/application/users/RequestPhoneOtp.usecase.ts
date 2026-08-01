@@ -21,7 +21,7 @@ export class RequestPhoneOtpUseCase {
     private readonly otpIssuer: OtpIssuer,
   ) {}
 
-  async execute(input: RequestPhoneOtpInput): Promise<void> {
+  async execute(input: RequestPhoneOtpInput): Promise<{ devOtp?: string }> {
     const user = await this.userRepo.findById(input.userId);
     if (!user || user.deletedAt) {
       throw new NotFoundError("User not found");
@@ -30,6 +30,6 @@ export class RequestPhoneOtpUseCase {
       throw new ValidationError("Add a phone number before requesting a verification code.");
     }
 
-    await this.otpIssuer.issue(user, "phone_verification");
+    return this.otpIssuer.issue(user, "phone_verification");
   }
 }

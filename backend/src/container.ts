@@ -329,6 +329,7 @@ export function buildContainer() {
     otpLength: env.otp.length,
     otpTtlSeconds: env.otp.ttlSeconds,
     otpMaxAttempts: env.otp.maxAttempts,
+    isProduction: env.isProduction,
   };
 
   // --- shared application services ---

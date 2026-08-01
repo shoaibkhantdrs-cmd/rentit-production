@@ -62,13 +62,14 @@ export class UpdateMeUseCase {
 
     await this.activityLogRepo.record({ userId: user.id, action: "profile.updated" });
 
+    let devOtp: string | undefined;
     if (phoneChanged && updated.phone) {
-      await this.otpIssuer.issue(updated, "phone_verification");
+      ({ devOtp } = await this.otpIssuer.issue(updated, "phone_verification"));
     }
 
     const roles = await this.userRoleRepo.listRoleNamesForUser(user.id);
     const preferences = await this.userPreferenceRepo.findByUserId(user.id);
 
-    return { ...toPublicUser(updated, roles), preferences };
+    return { ...toPublicUser(updated, roles), preferences, devOtp };
   }
 }
