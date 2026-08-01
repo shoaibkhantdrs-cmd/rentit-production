@@ -10,7 +10,6 @@ import {
   Car,
   CloudRain,
   Compass,
-  Copy,
   DoorOpen,
   Droplet,
   Dumbbell,
@@ -19,15 +18,12 @@ import {
   Flame,
   Fuel,
   Heart,
-  Mail,
   MapPin,
   MessageCircle,
   Pencil,
-  Phone,
   PhoneCall,
   Ruler,
   Shield,
-  ShieldCheck,
   Trash2,
   Trees,
   Wifi,
@@ -44,7 +40,6 @@ import { PropertyCard } from "@/components/PropertyCard";
 import { PropertyDetailSkeleton, PropertyGridSkeleton } from "@/components/Skeletons";
 import { ErrorState } from "@/components/ErrorState";
 import { useToast } from "@/components/ui/Toast";
-import { Badge } from "@/components/ui/Badge";
 import { ApiError } from "@/api/httpClient";
 import { formatCurrency } from "@/utils/format";
 
@@ -100,13 +95,6 @@ export function PropertyDetailsPage() {
   const [sharePhone, setSharePhone] = useState("");
   const [sharePhoneError, setSharePhoneError] = useState<string | null>(null);
   const [monthlyIncome, setMonthlyIncome] = useState("");
-  // Contact Owner: the real phone/email only ever arrive in `property.owner`
-  // when the viewer is authenticated (see PropertyDetailDTO/PropertyDetailLoader
-  // on the backend -- anonymous requests get maskedPhone only, never the
-  // real values). This local flag additionally keeps the UI itself showing
-  // only the masked form until the visitor explicitly clicks "Show Number",
-  // even for an authenticated viewer whose data already arrived.
-  const [phoneRevealed, setPhoneRevealed] = useState(false);
 
   if (status === "loading") return <PropertyDetailSkeleton />;
 
@@ -194,24 +182,6 @@ export function PropertyDetailsPage() {
       showToast(err instanceof ApiError ? err.message : "Could not start a conversation.", "error");
     } finally {
       setMessageBusy(false);
-    }
-  };
-
-  const handleShowNumber = () => {
-    if (!isAuthenticated) {
-      showToast("Please sign in to view the owner's phone number.", "info");
-      return;
-    }
-    setPhoneRevealed(true);
-  };
-
-  const handleCopyNumber = async () => {
-    if (!property.owner?.phone) return;
-    try {
-      await navigator.clipboard.writeText(`+${property.owner.phone}`);
-      showToast("Phone number copied.", "success");
-    } catch {
-      showToast("Could not copy the number.", "error");
     }
   };
 
@@ -446,58 +416,10 @@ export function PropertyDetailsPage() {
           <div className="owner-card-v2">
             <div className="owner-card-v2__avatar">{(property.owner?.name ?? "?").charAt(0).toUpperCase()}</div>
             <div>
-              <div className="owner-card-v2__name" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {property.owner?.name ?? "Unknown owner"}
-                {property.owner?.identityVerified ? (
-                  <Badge variant="success" icon={<ShieldCheck size={12} />}>Verified</Badge>
-                ) : null}
-              </div>
+              <div className="owner-card-v2__name">{property.owner?.name ?? "Unknown owner"}</div>
               <div className="owner-card-v2__meta">Listed on RentIt</div>
             </div>
           </div>
-
-          {!canManage && property.owner ? (
-            <div style={{ marginBottom: 10 }}>
-              {property.owner.maskedPhone ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.9rem" }}>
-                    {phoneRevealed && property.owner.phone ? `+${property.owner.phone}` : property.owner.maskedPhone}
-                  </span>
-                  {!phoneRevealed ? (
-                    <button type="button" className="btn-v2 btn-v2--secondary btn-v2--sm" onClick={handleShowNumber}>
-                      Show Number
-                    </button>
-                  ) : null}
-                </div>
-              ) : (
-                <p className="field-hint">Owner hasn't added a phone number.</p>
-              )}
-
-              {phoneRevealed && property.owner.phone ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-                  <a className="btn-v2 btn-v2--secondary btn-v2--sm" href={`tel:+${property.owner.phone}`}>
-                    <Phone size={14} /> Call Owner
-                  </a>
-                  <a
-                    className="btn-v2 btn-v2--secondary btn-v2--sm"
-                    href={`https://wa.me/${property.owner.phone}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <MessageCircle size={14} /> WhatsApp Owner
-                  </a>
-                  {property.owner.email ? (
-                    <a className="btn-v2 btn-v2--secondary btn-v2--sm" href={`mailto:${property.owner.email}`}>
-                      <Mail size={14} /> Email Owner
-                    </a>
-                  ) : null}
-                  <button type="button" className="btn-v2 btn-v2--secondary btn-v2--sm" onClick={handleCopyNumber}>
-                    <Copy size={14} /> Copy Number
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
 
           {!canManage ? (
             <button

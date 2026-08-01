@@ -23,17 +23,7 @@ export interface PropertyDetailDTO {
   createdAt: Date;
   updatedAt: Date;
   category: { id: string; name: string; slug: string } | null;
-  owner: {
-    id: string;
-    name: string;
-    identityVerified: boolean;
-    /** Always present when the owner has a phone on file, e.g. "+91 98XXXX3210" -- safe to show to anonymous visitors. */
-    maskedPhone: string | null;
-    /** Only populated when the viewer is authenticated (viewerUserId truthy) -- normalized digits with country code, e.g. "919876543210". Null for anonymous requests even if the owner has a phone. */
-    phone: string | null;
-    /** Only populated when the viewer is authenticated -- same reasoning as `phone`. */
-    email: string | null;
-  } | null;
+  owner: { id: string; name: string } | null;
   location: {
     addressLine: string;
     city: string;

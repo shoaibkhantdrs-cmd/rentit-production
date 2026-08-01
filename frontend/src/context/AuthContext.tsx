@@ -1,6 +1,5 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { authApi } from "@/api/auth";
-import { usersApi } from "@/api/users";
 import { tokenStore } from "@/api/tokenStore";
 import { PublicUser } from "@/api/types";
 
@@ -25,12 +24,6 @@ interface AuthContextValue {
    * clears local state the same way `logout` does. Resolves with how many
    * sessions were actually revoked, straight from the backend response. */
   logoutAllDevices: () => Promise<number>;
-  /** Re-fetches GET /users/me and updates the cached `user` in place
-   * (tokens untouched). Used after profile edits that change what `user`
-   * should show -- e.g. right after a phone number is verified, so the
-   * Contact Information section reflects the new phoneVerified/phone
-   * without a full page reload. */
-  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -124,16 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshUser = useCallback(async () => {
-    const stored = tokenStore.get();
-    if (!stored) return;
-    const profile = await usersApi.getMe();
-    tokenStore.set({
-      user: { ...stored.user, ...profile },
-      tokens: stored.tokens,
-    });
-  }, []);
-
   const logoutAllDevices = useCallback(async () => {
     // Needs the current access token, so call it *before* clearing local
     // state (unlike single-device logout, which is a public route keyed
@@ -159,7 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         logoutAllDevices,
-        refreshUser,
       }}
     >
       {children}
