@@ -13,7 +13,11 @@ test("register creates an account, assigns default role, and sends verification 
   });
 
   assert.equal(result.user.email, "ada@example.com", "email should be normalized to lowercase");
-  assert.deepEqual(result.user.roles, ["customer"], "default role should be customer");
+  assert.deepEqual(
+    result.user.roles,
+    ["customer", "property_owner"],
+    "new accounts get both the default customer role and property_owner, so listing a property needs no admin step",
+  );
   assert.equal(result.user.emailVerified, false);
   assert.ok(result.accessToken);
   assert.ok(result.refreshToken);
@@ -122,6 +126,6 @@ test("verify-otp with purpose=login authenticates and issues tokens", async () =
     assert.ok(result.refreshToken);
     const claims = c.tokenService.verifyAccessToken(result.accessToken);
     assert.equal(claims.sub, result.user.id);
-    assert.deepEqual(claims.roles, ["customer"]);
+    assert.deepEqual(claims.roles, ["customer", "property_owner"]);
   }
 });

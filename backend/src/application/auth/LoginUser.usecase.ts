@@ -12,7 +12,14 @@ import { OtpIssuer } from "@/application/auth/shared/OtpIssuer";
 import { parseIdentifier } from "@/application/auth/shared/identifier";
 import { logger } from "@/infrastructure/logging/logger";
 
-const DEFAULT_ROLE = "customer";
+// Both roles: "customer" so every renter-facing page works, "property_owner"
+// so List/Edit/Delete Property and image upload -- all role-gated in
+// property.routes.ts via authorize("property_owner", "admin", "super_admin")
+// -- work immediately too, with no admin step required. Mirrors the same
+// change made to RegisterUserUseCase.DEFAULT_ROLES: a brand-new email typed
+// into the sign-in box is sign-up in disguise (see autoRegister below), so
+// it must grant exactly the same roles a real /auth/register call would.
+const DEFAULT_ROLES = ["customer", "property_owner"];
 
 /** Turns "jane.doe+rentit@example.com" into "Jane.doe" -- a readable
  * placeholder the user can change on their Profile page later. Login-via-
@@ -100,17 +107,20 @@ try {
   }
 
   /** Mirrors the account-creation half of RegisterUserUseCase.execute()
-   * (user row, default "customer" role, default preferences, audit log) --
-   * deliberately skips RegisterUserUseCase's password hashing, welcome
-   * email, and immediate token issuance, since this path always continues
-   * into the normal OTP-issue/verify flow below/at VerifyOtpUseCase,
-   * exactly like an existing user logging in via OTP. */
+   * (user row, default "customer" + "property_owner" roles, default
+   * preferences, audit log) -- deliberately skips RegisterUserUseCase's
+   * password hashing, welcome email, and immediate token issuance, since
+   * this path always continues into the normal OTP-issue/verify flow
+   * below/at VerifyOtpUseCase, exactly like an existing user logging in via
+   * OTP. */
   private async autoRegister(email: string, device: DeviceContext): Promise<User> {
     const user = await this.userRepo.create({ name: nameFromEmail(email), email });
 
-    const role = await this.roleRepo.findByName(DEFAULT_ROLE);
-    if (role) {
-      await this.userRoleRepo.assign(user.id, role.id, null);
+    for (const roleName of DEFAULT_ROLES) {
+      const role = await this.roleRepo.findByName(roleName);
+      if (role) {
+        await this.userRoleRepo.assign(user.id, role.id, null);
+      }
     }
 
     await this.userPreferenceRepo.createDefault(user.id);

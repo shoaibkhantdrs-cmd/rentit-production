@@ -20,7 +20,17 @@ export interface RegisterUserInput {
   device: DeviceContext;
 }
 
-const DEFAULT_ROLE = "customer";
+// Both roles: "customer" so every renter-facing page works, "property_owner"
+// so List/Edit/Delete Property and image upload -- all role-gated in
+// property.routes.ts via authorize("property_owner", "admin", "super_admin")
+// -- work immediately too, with no admin step required. RentIt's real users
+// are both renters and owners interchangeably (the same person browses
+// listings AND may want to list their own place), so "customer" was never
+// a meaningful restriction to gate listing behind -- it just meant every
+// brand-new signup hit a dead-end 403/"contact support" wall on List
+// Property until an admin manually granted the role. Mirrors the identical
+// DEMO_USER_ROLES pattern already used by DevAutoLoginUseCase for local dev.
+const DEFAULT_ROLES = ["customer", "property_owner"];
 
 export class RegisterUserUseCase {
   constructor(
@@ -59,9 +69,11 @@ export class RegisterUserUseCase {
       passwordHash,
     });
 
-    const role = await this.roleRepo.findByName(DEFAULT_ROLE);
-    if (role) {
-      await this.userRoleRepo.assign(user.id, role.id, null);
+    for (const roleName of DEFAULT_ROLES) {
+      const role = await this.roleRepo.findByName(roleName);
+      if (role) {
+        await this.userRoleRepo.assign(user.id, role.id, null);
+      }
     }
 
     await this.userPreferenceRepo.createDefault(user.id);
