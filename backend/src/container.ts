@@ -372,6 +372,8 @@ export function buildContainer() {
     clock,
     sessionIssuer,
     otpIssuer,
+    roleRepo,
+    userPreferenceRepo,
   );
   const verifyOtp = new VerifyOtpUseCase(
     userRepo,
