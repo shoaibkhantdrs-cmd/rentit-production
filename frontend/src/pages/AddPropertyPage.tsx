@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -84,8 +84,13 @@ function initialValues(): WizardValues {
     rentAmount: 0,
     securityDeposit: 0,
     areaSqft: 0,
-    bedrooms: 1,
-    bathrooms: 1,
+    // Bedrooms/bathrooms used to default to 1 -- changed to 0 (matching the
+    // backend's own `.default(0)` in createPropertySchema) so the Pricing &
+    // size step can render these fields empty on a fresh draft instead of
+    // pre-filling a value the user never chose. 0 remains a perfectly valid
+    // submission value (a studio has 0 separate bedrooms), same as before.
+    bedrooms: 0,
+    bathrooms: 0,
     parkingSpaces: 0,
     furnishedStatus: "unfurnished",
     availableFrom: new Date().toISOString().slice(0, 10),
@@ -104,8 +109,25 @@ function loadDraft(): WizardValues {
   }
 }
 
+// Bug fix (property-owner-role follow-up): UpdateProperty.usecase.ts only
+// ever allowed admin/super_admin to set status: "published" directly
+// (ForbiddenError "Only an admin can publish a listing. Submit it for
+// review instead.") -- that's an intentional anti-abuse check (RC1 Fix #2:
+// a property_owner could otherwise self-publish a never-reviewed listing,
+// or un-hide one an admin had set "inactive"). The backend's intended
+// non-admin path is PATCH { status: "pending_review" } followed by an
+// admin approval (ApproveProperty.usecase.ts / POST
+// /admin/properties/:id/approve), but this page's Publish step never
+// exposed that -- it only ever called status: "published", so every
+// non-admin owner's "Publish now" click was guaranteed to 403 with no
+// way to proceed. ADMIN_ROLES/isAdmin below let this step show the
+// correct action for each role instead.
+const ADMIN_ROLES = ["admin", "super_admin"];
+
 function PropertyWizard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.roles.some((role) => ADMIN_ROLES.includes(role)) ?? false;
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<WizardValues>(loadDraft);
   const [categories, setCategories] = useState<PropertyCategory[]>([]);
@@ -116,6 +138,33 @@ function PropertyWizard() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
+  const [submittedForReview, setSubmittedForReview] = useState(false);
+
+  // Pricing & size step: rentAmount/securityDeposit/areaSqft/bedrooms/
+  // bathrooms/parkingSpaces are required `number` fields on WizardValues
+  // (CreatePropertyPayload), so they can't be `undefined` the way
+  // floorNumber/totalFloors already are -- that would change the shared
+  // API payload type. Instead each field gets its own display-only text
+  // state, decoupled from the committed numeric value: it starts blank
+  // (even though the underlying value defaults to 0), only ever contains
+  // digits the user actually typed, and is what the input's `value` prop
+  // renders. This means the visible field is never pre-filled with a "0"
+  // the user has to notice and delete, while `values.<field>` stays a
+  // real number the rest of the app (goNext's create call) already
+  // expects. Initialized from any restored localStorage draft so a
+  // returning user still sees what they previously typed.
+  const [rentText, setRentText] = useState(values.rentAmount ? String(values.rentAmount) : "");
+  const [depositText, setDepositText] = useState(values.securityDeposit ? String(values.securityDeposit) : "");
+  const [areaText, setAreaText] = useState(values.areaSqft ? String(values.areaSqft) : "");
+  const [bedroomsText, setBedroomsText] = useState(values.bedrooms ? String(values.bedrooms) : "");
+  const [bathroomsText, setBathroomsText] = useState(values.bathrooms ? String(values.bathrooms) : "");
+  const [parkingText, setParkingText] = useState(values.parkingSpaces ? String(values.parkingSpaces) : "");
+
+  // Pricing & size validation now happens only when Next is clicked (see
+  // goNext), with inline messages here instead of a silently-disabled
+  // button -- the same silent-disable pattern that caused the Step 0
+  // Next-button bug is exactly what this avoids for Step 3.
+  const [step3Errors, setStep3Errors] = useState<Partial<Record<"rentAmount" | "areaSqft" | "availableFrom", string>>>({});
 
   useEffect(() => {
     // Bug fix (QA report #8): a failed fetch used to silently resolve to
@@ -150,6 +199,29 @@ function PropertyWizard() {
       return { ...prev, features: current.includes(feature) ? current.filter((f) => f !== feature) : [...current, feature] };
     });
 
+  const digitsOnly = (raw: string) => raw.replace(/[^0-9]/g, "");
+
+  // Shared onChange for the six Pricing & size numeric fields: strips
+  // anything that isn't a digit (so users can only ever type digits, per
+  // spec), keeps the field's own display text in sync, and updates the
+  // real numeric value used by the create-property payload. Clears that
+  // field's step3Errors entry the moment it's no longer empty, so the
+  // error disappears as soon as it's fixed rather than lingering until
+  // the next Next click.
+  const handleNumericField =
+    (
+      setText: (v: string) => void,
+      key: "rentAmount" | "securityDeposit" | "areaSqft" | "bedrooms" | "bathrooms" | "parkingSpaces",
+    ) =>
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const digits = digitsOnly(e.target.value);
+      setText(digits);
+      update(key, digits === "" ? 0 : Number(digits));
+      if (key === "rentAmount" || key === "areaSqft") {
+        setStep3Errors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+      }
+    };
+
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
       setGeoStatus("Your browser doesn't support geolocation.");
@@ -174,15 +246,27 @@ function PropertyWizard() {
         return values.title.trim().length >= 5 && values.description.trim().length >= 20 && !!values.categoryId;
       case 1:
         return values.location.addressLine.trim().length >= 5 && values.location.city.trim().length >= 2;
-      case 3:
-        return values.rentAmount >= 0 && values.areaSqft >= 1 && !!values.availableFrom;
+      // case 3 (Pricing & size) intentionally omitted: that step is no
+      // longer gated by a silently-disabled Next button. Falls through to
+      // `default: true` below, and goNext() validates it explicitly on
+      // click instead, showing inline field-error messages for whatever
+      // is actually missing -- see the step === 3 block in goNext.
       default:
         return true;
     }
   }, [step, values]);
 
   const goNext = async () => {
-    if (!stepValid) return;
+    if (step === 3) {
+      const errors: typeof step3Errors = {};
+      if (!rentText.trim()) errors.rentAmount = "Monthly rent is required.";
+      if (!areaText.trim()) errors.areaSqft = "Area is required.";
+      if (!values.availableFrom) errors.availableFrom = "Available-from date is required.";
+      setStep3Errors(errors);
+      if (Object.keys(errors).length > 0) return;
+    } else if (!stepValid) {
+      return;
+    }
     // Entering the Photos step for the first time is when the real draft
     // gets created -- everything the backend requires has been collected.
     if (step === 3 && !createdProperty) {
@@ -213,6 +297,22 @@ function PropertyWizard() {
       setPublished(true);
     } catch (err) {
       setCreateError(err instanceof ApiError ? err.message : "Could not publish this listing.");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  // Non-admin counterpart to handlePublish -- see ADMIN_ROLES comment
+  // above for why this exists. Same status-transition endpoint, different
+  // target status, which UpdateProperty.usecase.ts allows for any owner.
+  const handleSubmitForReview = async () => {
+    if (!createdProperty) return;
+    setPublishing(true);
+    try {
+      await propertiesApi.update(createdProperty.id, { status: "pending_review" });
+      setSubmittedForReview(true);
+    } catch (err) {
+      setCreateError(err instanceof ApiError ? err.message : "Could not submit this listing for review.");
     } finally {
       setPublishing(false);
     }
@@ -351,31 +451,94 @@ function PropertyWizard() {
             <div className="form-grid">
               <div className="field">
                 <label htmlFor="w-rent">Monthly rent (₹)</label>
-                <input id="w-rent" type="number" min={0} required disabled={locked} value={values.rentAmount} onChange={(e) => update("rentAmount", Number(e.target.value))} />
+                <div className="input-group">
+                  <span className="input-group__prefix" aria-hidden="true">₹</span>
+                  <input
+                    id="w-rent"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="Example: 25000"
+                    disabled={locked}
+                    value={rentText}
+                    onChange={handleNumericField(setRentText, "rentAmount")}
+                  />
+                </div>
+                {step3Errors.rentAmount ? <span className="field-error">{step3Errors.rentAmount}</span> : null}
               </div>
               <div className="field">
                 <label htmlFor="w-deposit">Security deposit (₹)</label>
-                <input id="w-deposit" type="number" min={0} disabled={locked} value={values.securityDeposit} onChange={(e) => update("securityDeposit", Number(e.target.value))} />
+                <div className="input-group">
+                  <span className="input-group__prefix" aria-hidden="true">₹</span>
+                  <input
+                    id="w-deposit"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="Example: 50000"
+                    disabled={locked}
+                    value={depositText}
+                    onChange={handleNumericField(setDepositText, "securityDeposit")}
+                  />
+                </div>
               </div>
               <div className="field">
                 <label htmlFor="w-area">Area (sqft)</label>
-                <input id="w-area" type="number" min={1} required disabled={locked} value={values.areaSqft} onChange={(e) => update("areaSqft", Number(e.target.value))} />
+                <input
+                  id="w-area"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Example: 1200"
+                  disabled={locked}
+                  value={areaText}
+                  onChange={handleNumericField(setAreaText, "areaSqft")}
+                />
+                {step3Errors.areaSqft ? <span className="field-error">{step3Errors.areaSqft}</span> : null}
               </div>
               <div className="field">
                 <label htmlFor="w-available">Available from</label>
                 <input id="w-available" type="date" required disabled={locked} value={values.availableFrom} onChange={(e) => update("availableFrom", e.target.value)} />
+                {step3Errors.availableFrom ? <span className="field-error">{step3Errors.availableFrom}</span> : null}
               </div>
               <div className="field">
                 <label htmlFor="w-bedrooms">Bedrooms</label>
-                <input id="w-bedrooms" type="number" min={0} disabled={locked} value={values.bedrooms} onChange={(e) => update("bedrooms", Number(e.target.value))} />
+                <input
+                  id="w-bedrooms"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Example: 2"
+                  disabled={locked}
+                  value={bedroomsText}
+                  onChange={handleNumericField(setBedroomsText, "bedrooms")}
+                />
               </div>
               <div className="field">
                 <label htmlFor="w-bathrooms">Bathrooms</label>
-                <input id="w-bathrooms" type="number" min={0} disabled={locked} value={values.bathrooms} onChange={(e) => update("bathrooms", Number(e.target.value))} />
+                <input
+                  id="w-bathrooms"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Example: 2"
+                  disabled={locked}
+                  value={bathroomsText}
+                  onChange={handleNumericField(setBathroomsText, "bathrooms")}
+                />
               </div>
               <div className="field">
                 <label htmlFor="w-parking">Parking spaces</label>
-                <input id="w-parking" type="number" min={0} disabled={locked} value={values.parkingSpaces} onChange={(e) => update("parkingSpaces", Number(e.target.value))} />
+                <input
+                  id="w-parking"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Example: 1"
+                  disabled={locked}
+                  value={parkingText}
+                  onChange={handleNumericField(setParkingText, "parkingSpaces")}
+                />
               </div>
               <div className="field">
                 <label htmlFor="w-furnished">Furnished status</label>
@@ -451,16 +614,36 @@ function PropertyWizard() {
                   View listing
                 </button>
               </>
+            ) : submittedForReview ? (
+              <>
+                <div className="alert alert--success">
+                  Submitted for review. An admin will publish it shortly -- you'll be notified as soon as it goes live.
+                </div>
+                <button type="button" className="btn-v2 btn-v2--primary" onClick={() => navigate("/my-properties")}>
+                  Go to My Properties
+                </button>
+              </>
             ) : (
               <>
                 <p>
                   {formatCurrency(createdProperty.rentAmount)}/mo &middot; {createdProperty.images.length} photo
                   {createdProperty.images.length === 1 ? "" : "s"} &middot; currently saved as a draft.
                 </p>
+                {!isAdmin ? (
+                  <p className="field-hint">
+                    New listings go live after a quick admin review -- submit it now and we'll notify you the moment it's published.
+                  </p>
+                ) : null}
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button type="button" className="btn-v2 btn-v2--primary" onClick={handlePublish} disabled={publishing}>
-                    {publishing ? "Publishing..." : "Publish now"}
-                  </button>
+                  {isAdmin ? (
+                    <button type="button" className="btn-v2 btn-v2--primary" onClick={handlePublish} disabled={publishing}>
+                      {publishing ? "Publishing..." : "Publish now"}
+                    </button>
+                  ) : (
+                    <button type="button" className="btn-v2 btn-v2--primary" onClick={handleSubmitForReview} disabled={publishing}>
+                      {publishing ? "Submitting..." : "Submit for review"}
+                    </button>
+                  )}
                   <button type="button" className="btn-v2 btn-v2--secondary" onClick={() => navigate("/my-properties")}>
                     <Save size={15} /> Finish later (keep as draft)
                   </button>
@@ -473,7 +656,7 @@ function PropertyWizard() {
       </AnimatePresence>
       </div>
 
-      {!published ? (
+      {!published && !submittedForReview ? (
         <div className="wizard-footer">
           <button type="button" className="btn-v2 btn-v2--ghost" onClick={goBack} disabled={step === 0 || creating}>
             Back
