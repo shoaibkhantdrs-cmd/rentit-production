@@ -104,10 +104,35 @@ export class NominatimGeocodingService implements IGeocodingService {
       best = await this.searchOnce(freeformParams);
     }
 
+    // Third tier: an exact building/estate/apartment name (e.g. "Rolex
+    // Estate") is very often simply not in OpenStreetMap's index at all --
+    // that's a gap in the map data, not an invalid address. Rather than
+    // hard-failing the whole listing over an unindexed building name, drop
+    // addressLine entirely and resolve to the surrounding area instead
+    // (locality/city/state/postalcode/country), which Nominatim can
+    // essentially always find for any real Indian locality. This is the
+    // same tradeoff most consumer address forms make: an approximate pin
+    // on the right street/neighbourhood beats blocking submission outright
+    // when the specific building isn't mappable. Only attempted when there
+    // was actually more than just addressLine to search on -- with nothing
+    // but a bare addressLine and city, tier 2 already covered this case.
+    if (!best && (locality || state || postalCode)) {
+      const areaQuery = [locality, city, state, postalCode, country]
+        .filter((part): part is string => Boolean(part && part.trim()))
+        .join(", ");
+      const areaParams = new URLSearchParams({ format: "jsonv2", limit: "1", q: areaQuery });
+      if (isIndia) areaParams.set("countrycodes", "in");
+      logger.info(
+        { areaFallbackQuery: areaQuery },
+        "Freeform geocoding query also returned no results -- retrying at area level, without the building/address line",
+      );
+      best = await this.searchOnce(areaParams);
+    }
+
     if (!best) {
       throw new ValidationError(
-        `Could not resolve a location for "${fullAddress}" (Nominatim returned no results). ` +
-          "Provide latitude/longitude directly instead.",
+        `Could not resolve a location for "${fullAddress}" (Nominatim returned no results, even at the area level). ` +
+          "Double-check the city/state/PIN code, or provide latitude/longitude directly instead.",
       );
     }
 

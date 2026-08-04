@@ -71,6 +71,20 @@ function StepHeading({ title, stepIndex }: { title: ReactNode; stepIndex: number
   );
 }
 
+// Visible required-field marker. The wizard used to rely purely on the
+// Next button silently staying disabled until a required field passed
+// validation, with no on-screen indication of *which* fields were
+// required at all -- fine once you already know the rules, not fine for
+// a first-time user. Kept as an inline style (not a new index.css class)
+// so this change stays self-contained to this file's own diff.
+function RequiredMark() {
+  return (
+    <span aria-hidden="true" style={{ color: "var(--color-danger, #dc2626)" }}>
+      *
+    </span>
+  );
+}
+
 type WizardValues = CreatePropertyPayload;
 
 const DRAFT_KEY = "rentit:add-property-draft";
@@ -179,6 +193,14 @@ function PropertyWizard() {
   const [createdProperty, setCreatedProperty] = useState<PropertyDetail | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  // Geocoding failures are a distinct, address-specific error: shown only
+  // on the Address step (not the generic top-of-wizard createError banner),
+  // auto-cleared the moment the user edits any address field (see
+  // updateAddressField), and "retried" simply by the user continuing the
+  // wizard again with the corrected address -- goNext's create call is
+  // re-run from scratch with whatever is currently in `values`, so there's
+  // no separate stale request to invalidate.
+  const [geoError, setGeoError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [submittedForReview, setSubmittedForReview] = useState(false);
@@ -253,6 +275,10 @@ function PropertyWizard() {
       location: { ...prev.location, [key]: value, latitude: undefined, longitude: undefined },
     }));
     setGeoStatus(null);
+    // A geocoding failure is specific to the address that produced it --
+    // any further edit means it's no longer the same request, so the old
+    // error is stale and would be actively misleading if left on screen.
+    setGeoError(null);
   };
 
   const toggleFeature = (feature: string) =>
@@ -300,6 +326,32 @@ function PropertyWizard() {
     );
   };
 
+  // Mirrors NominatimGeocodingService's own India-detection heuristic
+  // (backend/src/infrastructure/maps/NominatimGeocodingService.ts) so the
+  // PIN code field's format hint/validation matches what the backend will
+  // actually treat as an Indian address -- an unset country defaults to
+  // "India" the same way it does there.
+  const isIndianAddress = (() => {
+    const normalized = (values.location.country ?? "").trim().toLowerCase();
+    return !normalized || normalized === "india" || normalized === "in";
+  })();
+
+  const [postalCodeTouched, setPostalCodeTouched] = useState(false);
+  const postalCodeInvalid = Boolean(values.location.postalCode) && values.location.postalCode!.length !== 6;
+
+  // PIN code gets its own handler (rather than a plain updateAddressField
+  // call) so it can restrict input the same way the Pricing & size step's
+  // numeric fields already do (digitsOnly, defined above): only digits are
+  // ever accepted while the address looks Indian, capped at 6 characters
+  // since Indian PIN codes are always exactly 6 digits. Non-Indian
+  // addresses fall back to free text (many countries use alphanumeric
+  // postal codes), capped at the backend's own 20-character limit.
+  const handlePostalCodeChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const next = isIndianAddress ? digitsOnly(raw).slice(0, 6) : raw.slice(0, 20);
+    updateAddressField("postalCode", next || undefined);
+  };
+
   const locked = createdProperty !== null; // steps 0-3 become read-only once the draft is created server-side
 
   const stepValid = useMemo(() => {
@@ -334,13 +386,36 @@ function PropertyWizard() {
     if (step === 3 && !createdProperty) {
       setCreating(true);
       setCreateError(null);
+      setGeoError(null);
       try {
         const result = await propertiesApi.create(values);
         setCreatedProperty(result);
         localStorage.removeItem(DRAFT_KEY);
         setStep(step + 1);
       } catch (err) {
-        setCreateError(err instanceof ApiError ? err.message : "Could not save this listing. Please try again.");
+        // Geocoding failures are the one create-time error that's actually
+        // about a specific step (Address) rather than the submission as a
+        // whole -- CreatePropertyUseCase only ever throws a
+        // VALIDATION_ERROR from *within* the create flow (after the
+        // request body has already passed Zod schema validation) when
+        // NominatimGeocodingService couldn't resolve a location; every
+        // other create-time failure is a generic VALIDATION_ERROR from
+        // pre-request payload validation, a NOT_FOUND for an unknown
+        // category, or something unrelated. Route those specifically back
+        // to the Address step and show them there instead of the generic
+        // top-of-wizard banner, so the error appears next to the fields
+        // that actually need fixing. It clears itself the instant any
+        // address field changes (updateAddressField), and "retrying" is
+        // just completing the wizard again -- this same catch block reruns
+        // geocoding from whatever is currently in `values` every time.
+        const isGeocodingFailure =
+          err instanceof ApiError && err.code === "VALIDATION_ERROR" && /geocod|resolve a location/i.test(err.message);
+        if (isGeocodingFailure) {
+          setGeoError(err.message);
+          setStep(1);
+        } else {
+          setCreateError(err instanceof ApiError ? err.message : "Could not save this listing. Please try again.");
+        }
       } finally {
         setCreating(false);
       }
@@ -468,9 +543,23 @@ function PropertyWizard() {
           <div className="form-section">
             <StepHeading title="Address" stepIndex={1} />
             {locked ? <p className="field-hint">Saved -- edit these later from My Properties.</p> : null}
+            {/* Geocoding failures are address-specific, so they're surfaced
+                only here on the Address step (never the generic top-of-wizard
+                createError banner) -- see goNext's create-catch block, which
+                routes the user back to this step when this happens. Cleared
+                automatically the instant any field below changes
+                (updateAddressField), and implicitly "retried" the next time
+                the user completes the wizard again with the corrected
+                address -- no separate retry action needed. */}
+            {geoError ? <div className="alert alert--error">{geoError}</div> : null}
             <div className="field">
-              <label htmlFor="w-address">Address / Building</label>
+              <label htmlFor="w-address">
+                Address Line <RequiredMark />
+              </label>
               <input id="w-address" required minLength={5} disabled={locked} value={values.location.addressLine} onChange={(e) => updateAddressField("addressLine", e.target.value)} placeholder="e.g. Flat 4B, Rolex Estate" />
+              {!locked && values.location.addressLine.trim().length > 0 && values.location.addressLine.trim().length < 5 ? (
+                <span className="field-error">Address line must be at least 5 characters ({values.location.addressLine.trim().length}/5).</span>
+              ) : null}
             </div>
             <div className="form-grid">
               <div className="field">
@@ -478,8 +567,13 @@ function PropertyWizard() {
                 <input id="w-locality" disabled={locked} value={values.location.locality ?? ""} onChange={(e) => updateAddressField("locality", e.target.value || undefined)} placeholder="e.g. Kamta" />
               </div>
               <div className="field">
-                <label htmlFor="w-city">City</label>
+                <label htmlFor="w-city">
+                  City <RequiredMark />
+                </label>
                 <input id="w-city" required minLength={2} disabled={locked} value={values.location.city} onChange={(e) => updateAddressField("city", e.target.value)} placeholder="e.g. Lucknow" />
+                {!locked && values.location.city.trim().length > 0 && values.location.city.trim().length < 2 ? (
+                  <span className="field-error">City must be at least 2 characters.</span>
+                ) : null}
               </div>
               <div className="field">
                 <label htmlFor="w-state">State</label>
@@ -491,11 +585,17 @@ function PropertyWizard() {
                   id="w-postal-code"
                   disabled={locked}
                   inputMode="numeric"
-                  maxLength={20}
+                  maxLength={isIndianAddress ? 6 : 20}
                   value={values.location.postalCode ?? ""}
-                  onChange={(e) => updateAddressField("postalCode", e.target.value || undefined)}
+                  onChange={handlePostalCodeChange}
+                  onBlur={() => setPostalCodeTouched(true)}
                   placeholder="e.g. 226028"
                 />
+                {isIndianAddress && postalCodeTouched && postalCodeInvalid ? (
+                  <span className="field-error">PIN code should be 6 digits.</span>
+                ) : (
+                  <span className="field-hint">{isIndianAddress ? "6-digit Indian PIN code" : "Postal / ZIP code"}</span>
+                )}
               </div>
               <div className="field">
                 <label htmlFor="w-country">Country</label>
@@ -508,7 +608,7 @@ function PropertyWizard() {
               </button>
             ) : null}
             {geoStatus ? <p className="field-hint">{geoStatus}</p> : null}
-            <p className="field-hint">Leave latitude/longitude blank to have the address geocoded automatically.</p>
+            <p className="field-hint">Leave latitude/longitude blank to have the address geocoded automatically from Address Line, Locality, City, State, PIN code and Country.</p>
           </div>
         )}
 

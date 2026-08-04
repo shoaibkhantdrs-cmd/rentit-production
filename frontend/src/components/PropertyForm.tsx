@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { propertiesApi } from "@/api/properties";
+import { ApiError } from "@/api/httpClient";
 import {
   CreatePropertyPayload,
   Facing,
@@ -9,6 +10,17 @@ import {
   PropertyDetail,
   PropertyType,
 } from "@/api/types";
+
+// See AddPropertyPage.tsx's RequiredMark for the rationale -- kept as an
+// inline style rather than a new index.css class so this stays
+// self-contained to this file's own diff.
+function RequiredMark() {
+  return (
+    <span aria-hidden="true" style={{ color: "var(--color-danger, #dc2626)" }}>
+      *
+    </span>
+  );
+}
 
 const PROPERTY_TYPES: PropertyType[] = [
   "apartment",
@@ -96,6 +108,11 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [geoStatus, setGeoStatus] = useState<string | null>(null);
+  // Geocoding failures, same as AddPropertyPage.tsx's wizard: shown next to
+  // the Location section instead of the generic top-of-form `error`
+  // banner, and cleared automatically the instant any address field
+  // changes (updateAddressField).
+  const [geoError, setGeoError] = useState<string | null>(null);
 
   useEffect(() => {
     propertiesApi
@@ -130,6 +147,7 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
       location: { ...prev.location, [key]: value, latitude: undefined, longitude: undefined },
     }));
     setGeoStatus(null);
+    setGeoError(null);
   };
 
   const toggleFeature = (feature: string) => {
@@ -158,14 +176,38 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
     );
   };
 
+  // Mirrors NominatimGeocodingService's own India-detection heuristic --
+  // see AddPropertyPage.tsx's identical helper for the full rationale.
+  const isIndianAddress = (() => {
+    const normalized = (values.location.country ?? "").trim().toLowerCase();
+    return !normalized || normalized === "india" || normalized === "in";
+  })();
+
+  const handlePostalCodeChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const next = isIndianAddress ? raw.replace(/[^0-9]/g, "").slice(0, 6) : raw.slice(0, 20);
+    updateAddressField("postalCode", next || undefined);
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setGeoError(null);
     setSubmitting(true);
     try {
       await onSubmit(values);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save this listing. Please try again.");
+      // Same detection as AddPropertyPage.tsx's wizard: a VALIDATION_ERROR
+      // reaching this catch block (i.e. after the request body already
+      // passed schema validation) with a geocoding-shaped message can only
+      // be NominatimGeocodingService failing to resolve the address.
+      const isGeocodingFailure =
+        err instanceof ApiError && err.code === "VALIDATION_ERROR" && /geocod|resolve a location/i.test(err.message);
+      if (isGeocodingFailure) {
+        setGeoError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : "Could not save this listing. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -363,8 +405,11 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
 
       <div className="form-section">
         <h2>Location</h2>
+        {geoError ? <div className="alert alert--error">{geoError}</div> : null}
         <div className="field">
-          <label htmlFor="pf-address">Address / Building</label>
+          <label htmlFor="pf-address">
+            Address Line <RequiredMark />
+          </label>
           <input
             id="pf-address"
             required
@@ -383,7 +428,9 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
             />
           </div>
           <div className="field">
-            <label htmlFor="pf-city">City</label>
+            <label htmlFor="pf-city">
+              City <RequiredMark />
+            </label>
             <input
               id="pf-city"
               required
@@ -405,10 +452,11 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
             <input
               id="pf-postal-code"
               inputMode="numeric"
-              maxLength={20}
+              maxLength={isIndianAddress ? 6 : 20}
               value={values.location.postalCode ?? ""}
-              onChange={(e) => updateAddressField("postalCode", e.target.value || undefined)}
+              onChange={handlePostalCodeChange}
             />
+            <span className="field-hint">{isIndianAddress ? "6-digit Indian PIN code" : "Postal / ZIP code"}</span>
           </div>
           <div className="field">
             <label htmlFor="pf-country">Country</label>
@@ -424,7 +472,8 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
         </button>
         {geoStatus ? <p className="field-hint">{geoStatus}</p> : null}
         <p className="field-hint">
-          Leave latitude/longitude blank to have the address geocoded automatically.
+          Leave latitude/longitude blank to have the address geocoded automatically from Address Line, Locality,
+          City, State, PIN code and Country.
         </p>
       </div>
 
