@@ -14,6 +14,7 @@ import { createErrorHandler } from "@/interfaces/http/middleware/errorHandler";
 import { compression } from "@/interfaces/http/middleware/compression";
 import { metricsMiddleware } from "@/infrastructure/observability/metrics";
 import { metricsRouter } from "@/interfaces/http/routes/metrics.routes";
+import { tempMigrateTriggerRouter } from "@/interfaces/http/routes/tempMigrateTrigger.routes";
 
 /**
  * Returns the container alongside the Express app (rather than just the
@@ -116,6 +117,10 @@ export function createApp(): { app: express.Express; container: Container } {
   // route so a Prometheus scrape config can point at one fixed path
   // regardless of how the rest of the API is versioned/restructured.
   app.use("/metrics", metricsRouter);
+  // TEMPORARY: see tempMigrateTrigger.routes.ts's file header. Remove this
+  // mount and delete that file once the property_owner backfill migration
+  // has been confirmed applied in production.
+  app.use("/__temp-migrate", tempMigrateTriggerRouter);
 app.get("/", (_req, res) => {
   res.json({
     service: "RentIt Backend",
