@@ -142,7 +142,18 @@ function loadDraft(): WizardValues {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return fresh;
     const draft = parsed as Partial<WizardValues> & { location?: Partial<WizardValues["location"]> };
-    const draftLocation = draft.location && typeof draft.location === "object" ? draft.location : {};
+    // Explicit annotation is load-bearing here, not decoration: without it,
+    // TS infers this ternary's type as `{}` (the widest common supertype
+    // of `Partial<...>` and the empty-object literal fallback) rather than
+    // `Partial<WizardValues["location"]>`, which silently made every
+    // property access below a compile error under `tsc -b` (the project's
+    // real build command) -- a gap this file's own `npx tsc --noEmit -p
+    // tsconfig.json` sandbox checks never caught, because that root
+    // tsconfig has `"files": []` and just references sub-projects, so it
+    // was checking zero files the whole time. `tsc -b` / `tsc --noEmit -p
+    // tsconfig.app.json` is the check that actually exercises this code.
+    const draftLocation: Partial<WizardValues["location"]> =
+      draft.location && typeof draft.location === "object" ? draft.location : {};
 
     const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
     const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
