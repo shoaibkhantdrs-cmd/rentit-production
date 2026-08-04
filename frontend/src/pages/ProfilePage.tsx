@@ -66,6 +66,10 @@ function ContactInfoCard() {
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
+  // Only ever set when the backend's DEV_OTP_MODE is on (see
+  // usersApi.requestPhoneOtp/updateMe doc comments) -- real Twilio
+  // delivery never populates this, so this card is a no-op in production.
+  const [devOtp, setDevOtp] = useState<string | null>(null);
 
   const handleDigitsChange = (e: ChangeEvent<HTMLInputElement>) => {
     setDigits(e.target.value.replace(/\D/g, "").slice(0, 10));
@@ -77,6 +81,17 @@ function ContactInfoCard() {
     setPendingPhone(null);
     setCode("");
     setOtpError(null);
+    setDevOtp(null);
+  };
+
+  /** Shared by every "a code was just issued" path -- if the backend
+   * handed back a devOtp (DEV_OTP_MODE only), surface it in the UI and
+   * pre-fill the verification field so dev/testing never has to go dig
+   * through Render logs to find it. No-op (both args undefined) in a real
+   * production response. */
+  const applyIssuedOtp = (otp: string | undefined) => {
+    setDevOtp(otp ?? null);
+    setCode(otp ?? "");
   };
 
   const handleVerifyPhoneClick = async () => {
@@ -92,10 +107,12 @@ function ContactInfoCard() {
         // Saving a new/changed number: UpdateMeUseCase checks for
         // duplicates, clears any prior verification, and auto-issues a
         // fresh phone_verification OTP -- see UpdateMe.usecase.ts.
-        await usersApi.updateMe({ phone: fullPhone });
+        const result = await usersApi.updateMe({ phone: fullPhone });
+        applyIssuedOtp(result.devOtp);
       } else {
         // Same number already on file, just unverified -- resend.
-        await usersApi.requestPhoneOtp();
+        const result = await usersApi.requestPhoneOtp();
+        applyIssuedOtp(result.otp);
       }
       setPendingPhone(fullPhone);
       setOtpSent(true);
@@ -111,7 +128,8 @@ function ContactInfoCard() {
     setSending(true);
     setOtpError(null);
     try {
-      await usersApi.requestPhoneOtp();
+      const result = await usersApi.requestPhoneOtp();
+      applyIssuedOtp(result.otp);
       showToast("A new code has been sent.", "success");
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : "Could not resend the code.", "error");
@@ -158,7 +176,8 @@ function ContactInfoCard() {
     if (!user?.phone) return;
     setSending(true);
     try {
-      await usersApi.requestPhoneOtp();
+      const result = await usersApi.requestPhoneOtp();
+      applyIssuedOtp(result.otp);
       setPendingPhone(user.phone);
       setOtpSent(true);
       showToast("Verification code sent to your phone.", "success");
@@ -244,6 +263,15 @@ function ContactInfoCard() {
           <p className="field-hint">
             Enter the code sent to <strong>{pendingPhone}</strong>.
           </p>
+          {devOtp ? (
+            // Only ever rendered when the backend's DEV_OTP_MODE is on --
+            // see applyIssuedOtp. Surfaces the code Twilio would otherwise
+            // have delivered by SMS so dev/testing doesn't need Render
+            // logs; the field below is already pre-filled with it too.
+            <div className="alert alert--info">
+              Dev mode: verification code is <strong>{devOtp}</strong> (pre-filled below).
+            </div>
+          ) : null}
           {otpError ? <div className="alert alert--error">{otpError}</div> : null}
           <div className="field">
             <label htmlFor="contact-phone-otp">Verification code</label>

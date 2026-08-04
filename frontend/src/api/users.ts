@@ -32,9 +32,17 @@ export interface UpdateMeInput {
 export const usersApi = {
   getMe: () => httpClient.get<MyProfile>("/users/me"),
 
-  updateMe: (input: UpdateMeInput) => httpClient.patch<MyProfile>("/users/me", input),
+  /** `devOtp` is only ever populated when the backend's DEV_OTP_MODE is on
+   * and this PATCH triggered a fresh phone_verification OTP (i.e. `phone`
+   * changed) -- see UpdateMe.usecase.ts / OtpIssuer.issue(). Absent in a
+   * normal production response, so every existing caller that ignores it
+   * is unaffected. */
+  updateMe: (input: UpdateMeInput) => httpClient.patch<MyProfile & { devOtp?: string }>("/users/me", input),
 
   /** Resends a phone_verification OTP for the phone already on file,
-   * without needing the number to change (e.g. the first code expired). */
-  requestPhoneOtp: () => httpClient.post<{ message: string }>("/users/me/phone/otp"),
+   * without needing the number to change (e.g. the first code expired).
+   * `otp` mirrors UpdateMeUseCase's `devOtp` -- populated only when the
+   * backend's DEV_OTP_MODE is on (see UserController.requestPhoneOtpHandler
+   * / OtpIssuer.issue()), so real Twilio delivery is completely unaffected. */
+  requestPhoneOtp: () => httpClient.post<{ message: string; otp?: string }>("/users/me/phone/otp"),
 };
