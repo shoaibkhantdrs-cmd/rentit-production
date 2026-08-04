@@ -151,16 +151,34 @@ export class UpdatePropertyUseCase {
       let formattedAddress = current?.formattedAddress ?? null;
       let placeId = current?.placeId ?? null;
 
+      // Bug fix: this only checked addressLine/city, so editing locality,
+      // state, postalCode, or country alone left the *previous* (now
+      // stale) latitude/longitude in place -- the property would keep
+      // showing at its old resolved location even though the address text
+      // had changed. Any address-field edit now invalidates the cached
+      // coordinates and triggers a fresh geocode, unless the caller also
+      // explicitly supplied new latitude/longitude in the same request.
       const addressChanged =
-        input.location.addressLine !== undefined || input.location.city !== undefined;
+        input.location.addressLine !== undefined ||
+        input.location.city !== undefined ||
+        input.location.locality !== undefined ||
+        input.location.state !== undefined ||
+        input.location.postalCode !== undefined ||
+        input.location.country !== undefined;
       const coordsProvided = input.location.latitude !== undefined || input.location.longitude !== undefined;
 
       if (addressChanged && !coordsProvided) {
-        const geocoded = await this.geocodingService.geocode(
+        // Geocodes exactly what this property's address currently is (the
+        // freshly-submitted fields merged with whatever wasn't touched in
+        // this request) -- never a value cached from an earlier draft.
+        const geocoded = await this.geocodingService.geocode({
           addressLine,
           city,
-          input.location.locality ?? current?.locality,
-        );
+          locality: input.location.locality ?? current?.locality,
+          state: input.location.state ?? current?.state,
+          postalCode: input.location.postalCode ?? current?.postalCode,
+          country: input.location.country ?? current?.country,
+        });
         latitude = geocoded.latitude;
         longitude = geocoded.longitude;
         formattedAddress = geocoded.formattedAddress;

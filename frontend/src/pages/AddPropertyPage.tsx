@@ -95,17 +95,60 @@ function initialValues(): WizardValues {
     furnishedStatus: "unfurnished",
     availableFrom: new Date().toISOString().slice(0, 10),
     features: [],
-    location: { addressLine: "", city: "" },
+    // Country defaults to "India" (this platform is India-only in practice
+    // -- every other field/currency on this page assumes it) but stays a
+    // plain editable text input, not a locked value.
+    location: { addressLine: "", city: "", state: "", country: "India", postalCode: "" },
   };
 }
 
 function loadDraft(): WizardValues {
+  const fresh = initialValues();
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return initialValues();
-    return { ...initialValues(), ...JSON.parse(raw) };
+    if (!raw) return fresh;
+    // Bug fix: this used to be `{ ...initialValues(), ...JSON.parse(raw) }`
+    // -- an untyped, unchecked *shallow* merge of whatever the parsed JSON
+    // happened to contain. Because `location` is itself an object, that
+    // shallow spread let a saved draft's entire `location` sub-object
+    // wholesale-replace the fresh one, silently carrying forward any
+    // field -- extra/renamed keys, values from a since-removed input, a
+    // manually-edited localStorage entry -- with zero validation and zero
+    // corresponding UI to see or clear it. This is precisely how a value
+    // the current form can't produce (e.g. a stray non-address word, or a
+    // stale addressLine typed out in full because State/PIN/Country inputs
+    // didn't exist yet) could resurface indefinitely on every future visit
+    // to this page and get silently resubmitted.
+    //
+    // Fix: parse into `unknown` and explicitly pick only the known,
+    // currently-supported top-level and location fields, each individually
+    // type/shape-checked. Anything else in the stored JSON (extra keys,
+    // wrong types, fields from a form that no longer exists) is dropped on
+    // load rather than carried forward forever.
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return fresh;
+    const draft = parsed as Partial<WizardValues> & { location?: Partial<WizardValues["location"]> };
+    const draftLocation = draft.location && typeof draft.location === "object" ? draft.location : {};
+
+    const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+    const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+
+    return {
+      ...fresh,
+      ...draft,
+      location: {
+        addressLine: str(draftLocation.addressLine) ?? fresh.location.addressLine,
+        city: str(draftLocation.city) ?? fresh.location.city,
+        locality: str(draftLocation.locality),
+        state: str(draftLocation.state) ?? fresh.location.state,
+        country: str(draftLocation.country) ?? fresh.location.country,
+        postalCode: str(draftLocation.postalCode) ?? fresh.location.postalCode,
+        latitude: num(draftLocation.latitude),
+        longitude: num(draftLocation.longitude),
+      },
+    };
   } catch {
-    return initialValues();
+    return fresh;
   }
 }
 
@@ -192,6 +235,25 @@ function PropertyWizard() {
 
   const updateLocation = <K extends keyof WizardValues["location"]>(key: K, value: WizardValues["location"][K]) =>
     setValues((prev) => ({ ...prev, location: { ...prev.location, [key]: value } }));
+
+  // Address text fields (as opposed to latitude/longitude, which this
+  // shares updateLocation with) go through this wrapper instead of
+  // updateLocation directly. Bug fix: previously, editing the address after
+  // "Use current location" had already set latitude/longitude left those
+  // now-stale coordinates in place with no visible connection to the text
+  // the user just changed -- the backend would then skip geocoding
+  // entirely (CreateProperty.usecase.ts only geocodes when lat/lng are
+  // undefined) and silently keep using the old, now-mismatched location.
+  // Clearing latitude/longitude here whenever any address field changes
+  // guarantees the backend always geocodes fresh from exactly what's
+  // currently in the form -- never a cached/previous resolution.
+  const updateAddressField = <K extends keyof WizardValues["location"]>(key: K, value: WizardValues["location"][K]) => {
+    setValues((prev) => ({
+      ...prev,
+      location: { ...prev.location, [key]: value, latitude: undefined, longitude: undefined },
+    }));
+    setGeoStatus(null);
+  };
 
   const toggleFeature = (feature: string) =>
     setValues((prev) => {
@@ -407,17 +469,37 @@ function PropertyWizard() {
             <StepHeading title="Address" stepIndex={1} />
             {locked ? <p className="field-hint">Saved -- edit these later from My Properties.</p> : null}
             <div className="field">
-              <label htmlFor="w-address">Address</label>
-              <input id="w-address" required minLength={5} disabled={locked} value={values.location.addressLine} onChange={(e) => updateLocation("addressLine", e.target.value)} />
+              <label htmlFor="w-address">Address / Building</label>
+              <input id="w-address" required minLength={5} disabled={locked} value={values.location.addressLine} onChange={(e) => updateAddressField("addressLine", e.target.value)} placeholder="e.g. Flat 4B, Rolex Estate" />
             </div>
             <div className="form-grid">
               <div className="field">
-                <label htmlFor="w-city">City</label>
-                <input id="w-city" required minLength={2} disabled={locked} value={values.location.city} onChange={(e) => updateLocation("city", e.target.value)} />
+                <label htmlFor="w-locality">Locality</label>
+                <input id="w-locality" disabled={locked} value={values.location.locality ?? ""} onChange={(e) => updateAddressField("locality", e.target.value || undefined)} placeholder="e.g. Kamta" />
               </div>
               <div className="field">
-                <label htmlFor="w-locality">Locality</label>
-                <input id="w-locality" disabled={locked} value={values.location.locality ?? ""} onChange={(e) => updateLocation("locality", e.target.value || undefined)} />
+                <label htmlFor="w-city">City</label>
+                <input id="w-city" required minLength={2} disabled={locked} value={values.location.city} onChange={(e) => updateAddressField("city", e.target.value)} placeholder="e.g. Lucknow" />
+              </div>
+              <div className="field">
+                <label htmlFor="w-state">State</label>
+                <input id="w-state" disabled={locked} value={values.location.state ?? ""} onChange={(e) => updateAddressField("state", e.target.value || undefined)} placeholder="e.g. Uttar Pradesh" />
+              </div>
+              <div className="field">
+                <label htmlFor="w-postal-code">PIN code</label>
+                <input
+                  id="w-postal-code"
+                  disabled={locked}
+                  inputMode="numeric"
+                  maxLength={20}
+                  value={values.location.postalCode ?? ""}
+                  onChange={(e) => updateAddressField("postalCode", e.target.value || undefined)}
+                  placeholder="e.g. 226028"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="w-country">Country</label>
+                <input id="w-country" disabled={locked} value={values.location.country ?? ""} onChange={(e) => updateAddressField("country", e.target.value || undefined)} placeholder="e.g. India" />
               </div>
             </div>
             {!locked ? (

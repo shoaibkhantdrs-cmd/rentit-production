@@ -80,11 +80,19 @@ export class CreatePropertyUseCase {
     let placeId: string | null = null;
 
     if (latitude === undefined || longitude === undefined) {
-      const geocoded = await this.geocodingService.geocode(
-        input.location.addressLine,
-        input.location.city,
-        input.location.locality,
-      );
+      // Bug fix: previously only passed addressLine/city/locality --
+      // state/postalCode/country were collected and stored (see
+      // locationRepo.upsert below) but never reached the geocoder itself.
+      // Passes exactly what was submitted in this request, nothing cached
+      // or reused from a prior call.
+      const geocoded = await this.geocodingService.geocode({
+        addressLine: input.location.addressLine,
+        city: input.location.city,
+        locality: input.location.locality,
+        state: input.location.state,
+        postalCode: input.location.postalCode,
+        country: input.location.country,
+      });
       latitude = geocoded.latitude;
       longitude = geocoded.longitude;
       formattedAddress = geocoded.formattedAddress;

@@ -50,7 +50,7 @@ function buildInitialValues(initial?: PropertyDetail): PropertyFormValues {
       furnishedStatus: "unfurnished",
       availableFrom: new Date().toISOString().slice(0, 10),
       features: [],
-      location: { addressLine: "", city: "" },
+      location: { addressLine: "", city: "", state: "", country: "India", postalCode: "" },
     };
   }
   return {
@@ -113,6 +113,23 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
     value: PropertyFormValues["location"][K],
   ) => {
     setValues((prev) => ({ ...prev, location: { ...prev.location, [key]: value } }));
+  };
+
+  // Address text fields go through this instead of updateLocation directly
+  // -- editing the address after latitude/longitude were already set (via
+  // "Use current location", or already resolved on the existing property
+  // being edited) must invalidate those now-stale coordinates so the
+  // backend re-geocodes from exactly what's currently in the form, instead
+  // of silently keeping a location that no longer matches the text.
+  const updateAddressField = <K extends keyof PropertyFormValues["location"]>(
+    key: K,
+    value: PropertyFormValues["location"][K],
+  ) => {
+    setValues((prev) => ({
+      ...prev,
+      location: { ...prev.location, [key]: value, latitude: undefined, longitude: undefined },
+    }));
+    setGeoStatus(null);
   };
 
   const toggleFeature = (feature: string) => {
@@ -347,16 +364,24 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
       <div className="form-section">
         <h2>Location</h2>
         <div className="field">
-          <label htmlFor="pf-address">Address</label>
+          <label htmlFor="pf-address">Address / Building</label>
           <input
             id="pf-address"
             required
             minLength={5}
             value={values.location.addressLine}
-            onChange={(e) => updateLocation("addressLine", e.target.value)}
+            onChange={(e) => updateAddressField("addressLine", e.target.value)}
           />
         </div>
         <div className="form-grid">
+          <div className="field">
+            <label htmlFor="pf-locality">Locality</label>
+            <input
+              id="pf-locality"
+              value={values.location.locality ?? ""}
+              onChange={(e) => updateAddressField("locality", e.target.value || undefined)}
+            />
+          </div>
           <div className="field">
             <label htmlFor="pf-city">City</label>
             <input
@@ -364,15 +389,33 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
               required
               minLength={2}
               value={values.location.city}
-              onChange={(e) => updateLocation("city", e.target.value)}
+              onChange={(e) => updateAddressField("city", e.target.value)}
             />
           </div>
           <div className="field">
-            <label htmlFor="pf-locality">Locality</label>
+            <label htmlFor="pf-state">State</label>
             <input
-              id="pf-locality"
-              value={values.location.locality ?? ""}
-              onChange={(e) => updateLocation("locality", e.target.value || undefined)}
+              id="pf-state"
+              value={values.location.state ?? ""}
+              onChange={(e) => updateAddressField("state", e.target.value || undefined)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="pf-postal-code">PIN code</label>
+            <input
+              id="pf-postal-code"
+              inputMode="numeric"
+              maxLength={20}
+              value={values.location.postalCode ?? ""}
+              onChange={(e) => updateAddressField("postalCode", e.target.value || undefined)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="pf-country">Country</label>
+            <input
+              id="pf-country"
+              value={values.location.country ?? ""}
+              onChange={(e) => updateAddressField("country", e.target.value || undefined)}
             />
           </div>
         </div>

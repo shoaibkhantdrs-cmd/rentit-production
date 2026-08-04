@@ -1,8 +1,12 @@
-import { GeocodeResult, IGeocodingService } from "@/domain/services/IGeocodingService";
+import { GeocodeAddressInput, GeocodeResult, IGeocodingService } from "@/domain/services/IGeocodingService";
 
-/** Stands in for Google's Geocoding API with deterministic, offline coordinates. */
+/** Stands in for the real Nominatim integration with deterministic, offline coordinates. */
 export class FakeGeocodingService implements IGeocodingService {
-  public readonly calls: Array<{ addressLine: string; city: string; locality?: string | null }> = [];
+  // Records the exact input object each call received (addressLine, city,
+  // locality, state, postalCode, country) -- tests can still read
+  // `calls[0].city` etc. directly since this pushes the full input
+  // unchanged, just like the old positional-args version did.
+  public readonly calls: GeocodeAddressInput[] = [];
 
   /** Override per-test to simulate a specific city's coordinates. */
   public nextResult: GeocodeResult = {
@@ -12,8 +16,8 @@ export class FakeGeocodingService implements IGeocodingService {
     placeId: "fake-place-id",
   };
 
-  async geocode(addressLine: string, city: string, locality?: string | null): Promise<GeocodeResult> {
-    this.calls.push({ addressLine, city, locality });
+  async geocode(input: GeocodeAddressInput): Promise<GeocodeResult> {
+    this.calls.push({ ...input });
     return this.nextResult;
   }
 }
