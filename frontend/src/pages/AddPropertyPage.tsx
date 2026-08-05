@@ -1,4 +1,4 @@
-import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, ReactNode, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -22,14 +22,32 @@ import {
   CreatePropertyPayload,
   Facing,
   FurnishedStatus,
+  PostalCodeLookupResult,
   PROPERTY_FEATURE_KEYS,
   PropertyCategory,
   PropertyDetail,
   PropertyType,
+  ReverseGeocodeResult,
 } from "@/api/types";
 import { ApiError } from "@/api/httpClient";
 import { Chip } from "@/components/ui/Chip";
 import { formatCurrency } from "@/utils/format";
+import { lazyNamed } from "@/utils/lazyNamed";
+
+// Perf: same lazy-loading approach already used for the Search page's map
+// view (ResultsMap) -- Leaflet/react-leaflet only ever load when the
+// Address step actually needs to show a map, not in every visitor's main
+// bundle.
+const AddressMap = lazyNamed<typeof import("@/components/AddressMap").AddressMap>(
+  () => import("@/components/AddressMap"),
+  "AddressMap",
+);
+
+// Geographic center of India -- used as the map's starting position only
+// when a PIN lookup fails and there's no other coordinate yet, so the user
+// can still drag the marker to their real location by hand instead of
+// being stuck with no map at all.
+const INDIA_CENTER: [number, number] = [22.9734, 78.6569];
 
 const PROPERTY_TYPES: PropertyType[] = ["apartment", "house", "villa", "studio", "pg", "room", "commercial", "shop", "other"];
 const FACINGS: Facing[] = ["north", "south", "east", "west", "north_east", "north_west", "south_east", "south_west"];
@@ -165,6 +183,7 @@ function loadDraft(): WizardValues {
         addressLine: str(draftLocation.addressLine) ?? fresh.location.addressLine,
         city: str(draftLocation.city) ?? fresh.location.city,
         locality: str(draftLocation.locality),
+        district: str(draftLocation.district),
         state: str(draftLocation.state) ?? fresh.location.state,
         country: str(draftLocation.country) ?? fresh.location.country,
         postalCode: str(draftLocation.postalCode) ?? fresh.location.postalCode,
@@ -212,6 +231,12 @@ function PropertyWizard() {
   // re-run from scratch with whatever is currently in `values`, so there's
   // no separate stale request to invalidate.
   const [geoError, setGeoError] = useState<string | null>(null);
+  // Phase 2 Part 1 (PIN-first Address step) state.
+  const [pinLookupStatus, setPinLookupStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [pinLookupError, setPinLookupError] = useState<string | null>(null);
+  const [localityOptions, setLocalityOptions] = useState<PostalCodeLookupResult[]>([]);
+  const [selectedLocalityIndex, setSelectedLocalityIndex] = useState<number | null>(null);
+  const [reverseGeocoding, setReverseGeocoding] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [submittedForReview, setSubmittedForReview] = useState(false);
@@ -269,17 +294,17 @@ function PropertyWizard() {
   const updateLocation = <K extends keyof WizardValues["location"]>(key: K, value: WizardValues["location"][K]) =>
     setValues((prev) => ({ ...prev, location: { ...prev.location, [key]: value } }));
 
-  // Address text fields (as opposed to latitude/longitude, which this
-  // shares updateLocation with) go through this wrapper instead of
-  // updateLocation directly. Bug fix: previously, editing the address after
-  // "Use current location" had already set latitude/longitude left those
-  // now-stale coordinates in place with no visible connection to the text
-  // the user just changed -- the backend would then skip geocoding
-  // entirely (CreateProperty.usecase.ts only geocodes when lat/lng are
-  // undefined) and silently keep using the old, now-mismatched location.
-  // Clearing latitude/longitude here whenever any address field changes
-  // guarantees the backend always geocodes fresh from exactly what's
-  // currently in the form -- never a cached/previous resolution.
+  // Under the Phase 2 Part 1 PIN-first flow, the PIN code field is the only
+  // remaining field where an edit should invalidate the marker: Country/
+  // State/District/City/Locality are now auto-filled (never manually
+  // typed, see spec item 5) and Address Line is just descriptive text
+  // (building/apartment/shop name, spec item 6) that was never used for
+  // geocoding to begin with. So unlike the old flow, this wrapper clears
+  // latitude/longitude only for the PIN code -- editing the PIN
+  // invalidates whatever location the old PIN resolved to, until the new
+  // PIN's lookup (handlePostalCodeChange) resolves a fresh one. Kept as a
+  // generic-key helper (rather than inlining into handlePostalCodeChange)
+  // in case a future field needs the same treatment.
   const updateAddressField = <K extends keyof WizardValues["location"]>(key: K, value: WizardValues["location"][K]) => {
     setValues((prev) => ({
       ...prev,
@@ -321,22 +346,6 @@ function PropertyWizard() {
       }
     };
 
-  const useCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setGeoStatus("Your browser doesn't support geolocation.");
-      return;
-    }
-    setGeoStatus("Locating...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        updateLocation("latitude", position.coords.latitude);
-        updateLocation("longitude", position.coords.longitude);
-        setGeoStatus("Current location captured.");
-      },
-      () => setGeoStatus("Could not get your location. You can still enter the address manually."),
-    );
-  };
-
   // Mirrors NominatimGeocodingService's own India-detection heuristic
   // (backend/src/infrastructure/maps/NominatimGeocodingService.ts) so the
   // PIN code field's format hint/validation matches what the backend will
@@ -350,17 +359,176 @@ function PropertyWizard() {
   const [postalCodeTouched, setPostalCodeTouched] = useState(false);
   const postalCodeInvalid = Boolean(values.location.postalCode) && values.location.postalCode!.length !== 6;
 
+  // Applies a resolved PIN-lookup/reverse-geocode result's address fields
+  // (country/state/district/city/locality) WITHOUT touching
+  // latitude/longitude or addressLine -- used by the marker-drag path
+  // (handleMarkerMove), which already owns the new coordinates directly
+  // from the drag event and must not let a slightly different
+  // reverse-geocoded coordinate silently override them.
+  const applyAddressFields = (resolved: PostalCodeLookupResult | ReverseGeocodeResult) => {
+    setValues((prev) => ({
+      ...prev,
+      location: {
+        ...prev.location,
+        country: resolved.country ?? prev.location.country,
+        state: resolved.state ?? undefined,
+        district: resolved.district ?? undefined,
+        city: resolved.city ?? prev.location.city,
+        locality: resolved.locality ?? undefined,
+      },
+    }));
+  };
+
+  // Applies a resolved result's address fields AND places the marker at its
+  // coordinates -- used by the PIN-lookup and "Use current location" paths,
+  // where the coordinates are new information rather than something the
+  // user just set directly.
+  const applyResolvedLocation = (resolved: PostalCodeLookupResult | ReverseGeocodeResult) => {
+    setValues((prev) => ({
+      ...prev,
+      location: {
+        ...prev.location,
+        country: resolved.country ?? prev.location.country,
+        state: resolved.state ?? undefined,
+        district: resolved.district ?? undefined,
+        city: resolved.city ?? prev.location.city,
+        locality: resolved.locality ?? undefined,
+        latitude: resolved.latitude,
+        longitude: resolved.longitude,
+      },
+    }));
+  };
+
+  // Triggered once the PIN code field reaches exactly 6 digits (Indian
+  // addresses only -- see handlePostalCodeChange below). A single result
+  // resolves and places the marker immediately; multiple candidate
+  // localities for the same PIN show a dropdown (per spec item 4) and wait
+  // for the user to pick one before placing the marker.
+  const lookupPostalCode = async (pin: string) => {
+    setPinLookupStatus("loading");
+    setPinLookupError(null);
+    setLocalityOptions([]);
+    setSelectedLocalityIndex(null);
+    setGeoError(null);
+    try {
+      const res = await propertiesApi.geocodePostalCode(pin, values.location.country);
+      if (res.items.length === 0) {
+        setPinLookupStatus("error");
+        setPinLookupError(`Could not find a location for PIN code "${pin}". You can still place the marker manually on the map.`);
+        return;
+      }
+      if (res.items.length === 1) {
+        applyResolvedLocation(res.items[0]);
+        setPinLookupStatus("success");
+        return;
+      }
+      // Multiple localities for the same PIN -- show the dropdown, don't
+      // guess. Auto-fill Country/State/District/City from the first
+      // candidate (those fields are typically identical across all
+      // candidates for one PIN) but leave locality/coordinates for the
+      // user's explicit choice.
+      setLocalityOptions(res.items);
+      applyAddressFields(res.items[0]);
+      setPinLookupStatus("success");
+    } catch (err) {
+      setPinLookupStatus("error");
+      setPinLookupError(err instanceof ApiError ? err.message : "Could not look up this PIN code. Please try again.");
+    }
+  };
+
   // PIN code gets its own handler (rather than a plain updateAddressField
   // call) so it can restrict input the same way the Pricing & size step's
   // numeric fields already do (digitsOnly, defined above): only digits are
   // ever accepted while the address looks Indian, capped at 6 characters
   // since Indian PIN codes are always exactly 6 digits. Non-Indian
   // addresses fall back to free text (many countries use alphanumeric
-  // postal codes), capped at the backend's own 20-character limit.
+  // postal codes), capped at the backend's own 20-character limit. Any
+  // edit clears the previous lookup's locality options/status/error --
+  // they belong to the previous PIN, not this one -- and once the field
+  // reaches exactly 6 digits (Indian addresses), the lookup fires
+  // automatically per spec item 3.
   const handlePostalCodeChange = (e: ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     const next = isIndianAddress ? digitsOnly(raw).slice(0, 6) : raw.slice(0, 20);
     updateAddressField("postalCode", next || undefined);
+    setPinLookupStatus("idle");
+    setPinLookupError(null);
+    setLocalityOptions([]);
+    setSelectedLocalityIndex(null);
+    if (isIndianAddress && next.length === 6) {
+      void lookupPostalCode(next);
+    }
+  };
+
+  // User's explicit choice from the multi-locality dropdown (spec item 4):
+  // applies that specific candidate's full address + coordinates and
+  // places the marker there.
+  const selectLocalityOption = (index: number) => {
+    const resolved = localityOptions[index];
+    if (!resolved) return;
+    setSelectedLocalityIndex(index);
+    applyResolvedLocation(resolved);
+  };
+
+  // Marker-drag handler (spec items 9-10): the dragged-to coordinates are
+  // authoritative the instant the drag ends -- set them immediately so the
+  // map/marker never visually snaps back -- then reverse-geocode in the
+  // background to refresh the text address fields to match. If reverse
+  // geocoding fails, the coordinates the user actually placed the marker
+  // at are kept as-is; only the text fields are left showing whatever they
+  // had before.
+  const handleMarkerMove = async (latitude: number, longitude: number) => {
+    updateLocation("latitude", latitude);
+    updateLocation("longitude", longitude);
+    setReverseGeocoding(true);
+    setGeoError(null);
+    try {
+      const resolved = await propertiesApi.reverseGeocode(latitude, longitude);
+      applyAddressFields(resolved);
+      setPinLookupStatus("success");
+      setPinLookupError(null);
+    } catch {
+      // Non-fatal: the marker position (already applied above) remains the
+      // source of truth even if we couldn't refresh the text fields.
+    } finally {
+      setReverseGeocoding(false);
+    }
+  };
+
+  // "Use current location" (spec items 11-12): get GPS coordinates, place
+  // the marker immediately (same immediate-then-refine pattern as
+  // handleMarkerMove), then reverse-geocode to auto-fill the address
+  // fields. Falls back gracefully -- keeping the coordinates even if
+  // reverse geocoding fails -- so the user can still finish the address
+  // fields (or the marker alone) by hand.
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setGeoStatus("Your browser doesn't support geolocation.");
+      return;
+    }
+    setGeoStatus("Locating...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        updateLocation("latitude", latitude);
+        updateLocation("longitude", longitude);
+        setGeoStatus("Current location captured -- looking up address...");
+        setReverseGeocoding(true);
+        setGeoError(null);
+        propertiesApi
+          .reverseGeocode(latitude, longitude)
+          .then((resolved) => {
+            applyAddressFields(resolved);
+            setPinLookupStatus("success");
+            setGeoStatus("Current location captured and address filled in.");
+          })
+          .catch(() => {
+            setGeoStatus("Current location captured. Could not auto-fill the address -- please fill it in manually.");
+          })
+          .finally(() => setReverseGeocoding(false));
+      },
+      () => setGeoStatus("Could not get your location. You can still enter the address manually."),
+    );
   };
 
   const locked = createdProperty !== null; // steps 0-3 become read-only once the draft is created server-side
@@ -369,8 +537,17 @@ function PropertyWizard() {
     switch (step) {
       case 0:
         return values.title.trim().length >= 5 && values.description.trim().length >= 20 && !!values.categoryId;
+      // Phase 2 Part 1 validation (spec item 13): PIN required, Address
+      // Line required, and a marker must be placed (latitude/longitude
+      // both set) before the user can continue -- either from a resolved
+      // PIN lookup, a dragged marker, or "Use current location".
       case 1:
-        return values.location.addressLine.trim().length >= 5 && values.location.city.trim().length >= 2;
+        return (
+          Boolean(values.location.postalCode?.trim()) &&
+          values.location.addressLine.trim().length >= 5 &&
+          values.location.latitude !== undefined &&
+          values.location.longitude !== undefined
+        );
       // case 3 (Pricing & size) intentionally omitted: that step is no
       // longer gated by a silently-disabled Next button. Falls through to
       // `default: true` below, and goNext() validates it explicitly on
@@ -558,68 +735,145 @@ function PropertyWizard() {
                 only here on the Address step (never the generic top-of-wizard
                 createError banner) -- see goNext's create-catch block, which
                 routes the user back to this step when this happens. Cleared
-                automatically the instant any field below changes
-                (updateAddressField), and implicitly "retried" the next time
-                the user completes the wizard again with the corrected
-                address -- no separate retry action needed. */}
+                automatically the instant the PIN changes (updateAddressField)
+                or a marker move/current-location lookup succeeds, and
+                implicitly "retried" the next time the user completes the
+                wizard again with the corrected address -- no separate retry
+                action needed. */}
             {geoError ? <div className="alert alert--error">{geoError}</div> : null}
+
+            {/* Phase 2 Part 1: PIN Code is the first required field (spec
+                item 2) -- entering a valid 6-digit Indian PIN triggers an
+                automatic lookup (handlePostalCodeChange) that auto-fills
+                Country/State/District/City/Locality below, so the user never
+                has to type them by hand (spec item 5). */}
+            <div className="field">
+              <label htmlFor="w-postal-code">
+                PIN code <RequiredMark />
+              </label>
+              <input
+                id="w-postal-code"
+                required
+                disabled={locked}
+                inputMode="numeric"
+                maxLength={isIndianAddress ? 6 : 20}
+                value={values.location.postalCode ?? ""}
+                onChange={handlePostalCodeChange}
+                onBlur={() => setPostalCodeTouched(true)}
+                placeholder="e.g. 226028"
+              />
+              {isIndianAddress && postalCodeTouched && postalCodeInvalid ? (
+                <span className="field-error">PIN code should be 6 digits.</span>
+              ) : pinLookupStatus === "loading" ? (
+                <span className="field-hint">Looking up this PIN code...</span>
+              ) : pinLookupStatus === "error" && pinLookupError ? (
+                <span className="field-error">{pinLookupError}</span>
+              ) : pinLookupStatus === "success" ? (
+                <span className="field-hint">Location found -- check the map below and adjust the pin if needed.</span>
+              ) : (
+                <span className="field-hint">{isIndianAddress ? "6-digit Indian PIN code" : "Postal / ZIP code"}</span>
+              )}
+            </div>
+
+            {/* Multiple localities can share one PIN code -- shown only when
+                the lookup actually returned more than one candidate (spec
+                item 4). Picking an option re-applies that candidate's full
+                address + coordinates and moves the marker. */}
+            {!locked && localityOptions.length > 1 ? (
+              <div className="field">
+                <label htmlFor="w-locality-choice">Which locality?</label>
+                <select
+                  id="w-locality-choice"
+                  value={selectedLocalityIndex ?? ""}
+                  onChange={(e) => selectLocalityOption(Number(e.target.value))}
+                >
+                  <option value="" disabled>
+                    Select the matching locality
+                  </option>
+                  {localityOptions.map((option, index) => (
+                    <option key={`${option.locality ?? option.formattedAddress}-${index}`} value={index}>
+                      {option.locality ?? option.formattedAddress}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
             <div className="field">
               <label htmlFor="w-address">
                 Address Line <RequiredMark />
               </label>
-              <input id="w-address" required minLength={5} disabled={locked} value={values.location.addressLine} onChange={(e) => updateAddressField("addressLine", e.target.value)} placeholder="e.g. Flat 4B, Rolex Estate" />
+              <input
+                id="w-address"
+                required
+                minLength={5}
+                disabled={locked}
+                value={values.location.addressLine}
+                onChange={(e) => updateLocation("addressLine", e.target.value)}
+                placeholder="e.g. Flat 4B, Rolex Estate / Shop No. 12 / House No. 45"
+              />
+              <span className="field-hint">Building name, apartment, shop name, or house number.</span>
               {!locked && values.location.addressLine.trim().length > 0 && values.location.addressLine.trim().length < 5 ? (
                 <span className="field-error">Address line must be at least 5 characters ({values.location.addressLine.trim().length}/5).</span>
               ) : null}
             </div>
+
+            {/* Country/State/District/City are auto-filled only -- never
+                manually typed (spec item 5). Read-only rather than removed
+                entirely so the user can see and trust what was resolved. */}
             <div className="form-grid">
               <div className="field">
                 <label htmlFor="w-locality">Locality</label>
-                <input id="w-locality" disabled={locked} value={values.location.locality ?? ""} onChange={(e) => updateAddressField("locality", e.target.value || undefined)} placeholder="e.g. Kamta" />
+                <input id="w-locality" readOnly disabled={locked} value={values.location.locality ?? ""} placeholder="Auto-filled from PIN code" />
               </div>
               <div className="field">
-                <label htmlFor="w-city">
-                  City <RequiredMark />
-                </label>
-                <input id="w-city" required minLength={2} disabled={locked} value={values.location.city} onChange={(e) => updateAddressField("city", e.target.value)} placeholder="e.g. Lucknow" />
-                {!locked && values.location.city.trim().length > 0 && values.location.city.trim().length < 2 ? (
-                  <span className="field-error">City must be at least 2 characters.</span>
-                ) : null}
+                <label htmlFor="w-city">City</label>
+                <input id="w-city" readOnly disabled={locked} value={values.location.city} placeholder="Auto-filled from PIN code" />
+              </div>
+              <div className="field">
+                <label htmlFor="w-district">District</label>
+                <input id="w-district" readOnly disabled={locked} value={values.location.district ?? ""} placeholder="Auto-filled from PIN code" />
               </div>
               <div className="field">
                 <label htmlFor="w-state">State</label>
-                <input id="w-state" disabled={locked} value={values.location.state ?? ""} onChange={(e) => updateAddressField("state", e.target.value || undefined)} placeholder="e.g. Uttar Pradesh" />
-              </div>
-              <div className="field">
-                <label htmlFor="w-postal-code">PIN code</label>
-                <input
-                  id="w-postal-code"
-                  disabled={locked}
-                  inputMode="numeric"
-                  maxLength={isIndianAddress ? 6 : 20}
-                  value={values.location.postalCode ?? ""}
-                  onChange={handlePostalCodeChange}
-                  onBlur={() => setPostalCodeTouched(true)}
-                  placeholder="e.g. 226028"
-                />
-                {isIndianAddress && postalCodeTouched && postalCodeInvalid ? (
-                  <span className="field-error">PIN code should be 6 digits.</span>
-                ) : (
-                  <span className="field-hint">{isIndianAddress ? "6-digit Indian PIN code" : "Postal / ZIP code"}</span>
-                )}
+                <input id="w-state" readOnly disabled={locked} value={values.location.state ?? ""} placeholder="Auto-filled from PIN code" />
               </div>
               <div className="field">
                 <label htmlFor="w-country">Country</label>
-                <input id="w-country" disabled={locked} value={values.location.country ?? ""} onChange={(e) => updateAddressField("country", e.target.value || undefined)} placeholder="e.g. India" />
+                <input id="w-country" readOnly disabled={locked} value={values.location.country ?? ""} placeholder="Auto-filled from PIN code" />
               </div>
             </div>
+
             {!locked ? (
               <button type="button" className="btn-v2 btn-v2--secondary btn-v2--sm" onClick={useCurrentLocation}>
                 <MapPin size={14} /> Use current location
               </button>
             ) : null}
             {geoStatus ? <p className="field-hint">{geoStatus}</p> : null}
-            <p className="field-hint">Leave latitude/longitude blank to have the address geocoded automatically from Address Line, Locality, City, State, PIN code and Country.</p>
+
+            {/* Interactive map (spec items 7-10): appears as soon as a
+                marker position exists -- a successful PIN lookup, "Use
+                current location", or (once shown) a drag -- and lets the
+                user drag the marker to correct it, reverse-geocoding on
+                every drop to keep the text fields in sync. */}
+            {!locked && (pinLookupStatus === "success" || pinLookupStatus === "error" || values.location.latitude !== undefined) ? (
+              <div className="field">
+                <label>Map location {reverseGeocoding ? <span className="field-hint">(updating address...)</span> : null}</label>
+                <Suspense fallback={<p className="field-hint">Loading map...</p>}>
+                  <AddressMap
+                    position={
+                      values.location.latitude !== undefined && values.location.longitude !== undefined
+                        ? [values.location.latitude, values.location.longitude]
+                        : INDIA_CENTER
+                    }
+                    onMarkerMove={handleMarkerMove}
+                  />
+                </Suspense>
+                <span className="field-hint">Drag the pin to set your exact location -- required before continuing.</span>
+              </div>
+            ) : !locked ? (
+              <p className="field-hint">Enter a PIN code above or use current location to show the map and place a marker.</p>
+            ) : null}
           </div>
         )}
 

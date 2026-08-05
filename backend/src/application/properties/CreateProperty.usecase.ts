@@ -30,6 +30,7 @@ export interface CreatePropertyInput {
     addressLine: string;
     city: string;
     locality?: string;
+    district?: string;
     state?: string;
     country?: string;
     postalCode?: string;
@@ -104,6 +105,7 @@ export class CreatePropertyUseCase {
       addressLine: input.location.addressLine,
       city: input.location.city,
       locality: input.location.locality ?? null,
+      district: input.location.district ?? null,
       state: input.location.state ?? null,
       country: input.location.country ?? null,
       postalCode: input.location.postalCode ?? null,

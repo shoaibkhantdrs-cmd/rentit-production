@@ -110,6 +110,7 @@ export interface PropertyLocationDTO {
   addressLine: string;
   city: string;
   locality: string | null;
+  district: string | null;
   state: string | null;
   country: string | null;
   postalCode: string | null;
@@ -192,11 +193,41 @@ export interface PropertyFormLocationInput {
   addressLine: string;
   city: string;
   locality?: string;
+  district?: string;
   state?: string;
   country?: string;
   postalCode?: string;
   latitude?: number;
   longitude?: number;
+}
+
+// Phase 2 Part 1 (PIN-first Address step): one resolved locality candidate
+// for a postal code. A single PIN can cover more than one locality, so
+// geocodePostalCode() always returns an array -- the caller auto-fills
+// directly when there's exactly one, or shows a picker when there's more.
+export interface PostalCodeLookupResult {
+  country: string | null;
+  state: string | null;
+  district: string | null;
+  city: string | null;
+  locality: string | null;
+  postalCode: string;
+  latitude: number;
+  longitude: number;
+  formattedAddress: string;
+}
+
+// Result of resolving a single lat/lng pair back to address components
+// (marker drag / "Use current location").
+export interface ReverseGeocodeResult {
+  country: string | null;
+  state: string | null;
+  district: string | null;
+  city: string | null;
+  locality: string | null;
+  formattedAddress: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface CreatePropertyPayload {

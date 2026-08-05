@@ -93,6 +93,8 @@ import { ListNotificationsUseCase } from "@/application/notifications/ListNotifi
 import { MarkNotificationsReadUseCase } from "@/application/notifications/MarkNotificationsRead.usecase";
 import { PropertyDetailLoader } from "@/application/properties/shared/PropertyDetailLoader";
 import { CreatePropertyUseCase } from "@/application/properties/CreateProperty.usecase";
+import { GeocodePostalCodeUseCase } from "@/application/properties/GeocodePostalCode.usecase";
+import { ReverseGeocodeLocationUseCase } from "@/application/properties/ReverseGeocodeLocation.usecase";
 import { GetPropertyUseCase } from "@/application/properties/GetProperty.usecase";
 import { SearchPropertiesUseCase } from "@/application/properties/SearchProperties.usecase";
 import { UpdatePropertyUseCase } from "@/application/properties/UpdateProperty.usecase";
@@ -458,6 +460,8 @@ export function buildContainer() {
     geocodingService,
     propertyDetailLoader,
   );
+  const geocodePostalCode = new GeocodePostalCodeUseCase(geocodingService);
+  const reverseGeocodeLocation = new ReverseGeocodeLocationUseCase(geocodingService);
   const getProperty = new GetPropertyUseCase(propertyRepo, propertyViewRepo, propertyDetailLoader);
   const searchProperties = new SearchPropertiesUseCase(
     propertyRepo,
@@ -847,6 +851,8 @@ export function buildContainer() {
   const adminAuditController = new AdminAuditController(searchAuditLogs);
   const propertyController = new PropertyController(
     createProperty,
+    geocodePostalCode,
+    reverseGeocodeLocation,
     getProperty,
     searchProperties,
     updateProperty,

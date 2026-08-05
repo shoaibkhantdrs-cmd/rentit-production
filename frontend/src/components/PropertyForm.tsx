@@ -1,15 +1,27 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, Suspense, useEffect, useState } from "react";
 import { propertiesApi } from "@/api/properties";
 import { ApiError } from "@/api/httpClient";
 import {
   CreatePropertyPayload,
   Facing,
   FurnishedStatus,
+  PostalCodeLookupResult,
   PROPERTY_FEATURE_KEYS,
   PropertyCategory,
   PropertyDetail,
   PropertyType,
+  ReverseGeocodeResult,
 } from "@/api/types";
+import { lazyNamed } from "@/utils/lazyNamed";
+
+// Same lazy-loaded map as AddPropertyPage.tsx's wizard -- see that file for
+// the full rationale.
+const AddressMap = lazyNamed<typeof import("@/components/AddressMap").AddressMap>(
+  () => import("@/components/AddressMap"),
+  "AddressMap",
+);
+
+const INDIA_CENTER: [number, number] = [22.9734, 78.6569];
 
 // See AddPropertyPage.tsx's RequiredMark for the rationale -- kept as an
 // inline style rather than a new index.css class so this stays
@@ -87,6 +99,7 @@ function buildInitialValues(initial?: PropertyDetail): PropertyFormValues {
       addressLine: initial.location?.addressLine ?? "",
       city: initial.location?.city ?? "",
       locality: initial.location?.locality ?? undefined,
+      district: initial.location?.district ?? undefined,
       state: initial.location?.state ?? undefined,
       country: initial.location?.country ?? undefined,
       postalCode: initial.location?.postalCode ?? undefined,
@@ -114,6 +127,14 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
   // banner, and cleared automatically the instant any address field
   // changes (updateAddressField).
   const [geoError, setGeoError] = useState<string | null>(null);
+  // Phase 2 Part 1 (PIN-first Address step) state -- mirrors
+  // AddPropertyPage.tsx's wizard.
+  const [pinLookupStatus, setPinLookupStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [pinLookupError, setPinLookupError] = useState<string | null>(null);
+  const [localityOptions, setLocalityOptions] = useState<PostalCodeLookupResult[]>([]);
+  const [selectedLocalityIndex, setSelectedLocalityIndex] = useState<number | null>(null);
+  const [reverseGeocoding, setReverseGeocoding] = useState(false);
+  const [postalCodeTouched, setPostalCodeTouched] = useState(false);
 
   useEffect(() => {
     propertiesApi
@@ -133,12 +154,11 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
     setValues((prev) => ({ ...prev, location: { ...prev.location, [key]: value } }));
   };
 
-  // Address text fields go through this instead of updateLocation directly
-  // -- editing the address after latitude/longitude were already set (via
-  // "Use current location", or already resolved on the existing property
-  // being edited) must invalidate those now-stale coordinates so the
-  // backend re-geocodes from exactly what's currently in the form, instead
-  // of silently keeping a location that no longer matches the text.
+  // Phase 2 Part 1: under the PIN-first flow only the PIN code field should
+  // invalidate the marker on edit -- Country/State/District/City/Locality
+  // are auto-filled (never manually typed) and Address Line is just
+  // descriptive text, not something geocoding depends on. See
+  // AddPropertyPage.tsx's identical helper for the full rationale.
   const updateAddressField = <K extends keyof PropertyFormValues["location"]>(
     key: K,
     value: PropertyFormValues["location"][K],
@@ -161,6 +181,97 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
     });
   };
 
+  const digitsOnly = (raw: string) => raw.replace(/[^0-9]/g, "");
+
+  // Applies a resolved result's address fields only, leaving
+  // latitude/longitude and addressLine untouched -- used by the
+  // marker-drag path, which already owns the new coordinates directly.
+  const applyAddressFields = (resolved: PostalCodeLookupResult | ReverseGeocodeResult) => {
+    setValues((prev) => ({
+      ...prev,
+      location: {
+        ...prev.location,
+        country: resolved.country ?? prev.location.country,
+        state: resolved.state ?? undefined,
+        district: resolved.district ?? undefined,
+        city: resolved.city ?? prev.location.city,
+        locality: resolved.locality ?? undefined,
+      },
+    }));
+  };
+
+  // Applies a resolved result's address fields AND places the marker at
+  // its coordinates -- used by the PIN-lookup and "Use current location"
+  // paths.
+  const applyResolvedLocation = (resolved: PostalCodeLookupResult | ReverseGeocodeResult) => {
+    setValues((prev) => ({
+      ...prev,
+      location: {
+        ...prev.location,
+        country: resolved.country ?? prev.location.country,
+        state: resolved.state ?? undefined,
+        district: resolved.district ?? undefined,
+        city: resolved.city ?? prev.location.city,
+        locality: resolved.locality ?? undefined,
+        latitude: resolved.latitude,
+        longitude: resolved.longitude,
+      },
+    }));
+  };
+
+  const lookupPostalCode = async (pin: string) => {
+    setPinLookupStatus("loading");
+    setPinLookupError(null);
+    setLocalityOptions([]);
+    setSelectedLocalityIndex(null);
+    setGeoError(null);
+    try {
+      const res = await propertiesApi.geocodePostalCode(pin, values.location.country);
+      if (res.items.length === 0) {
+        setPinLookupStatus("error");
+        setPinLookupError(`Could not find a location for PIN code "${pin}". You can still place the marker manually on the map.`);
+        return;
+      }
+      if (res.items.length === 1) {
+        applyResolvedLocation(res.items[0]);
+        setPinLookupStatus("success");
+        return;
+      }
+      setLocalityOptions(res.items);
+      applyAddressFields(res.items[0]);
+      setPinLookupStatus("success");
+    } catch (err) {
+      setPinLookupStatus("error");
+      setPinLookupError(err instanceof ApiError ? err.message : "Could not look up this PIN code. Please try again.");
+    }
+  };
+
+  const selectLocalityOption = (index: number) => {
+    const resolved = localityOptions[index];
+    if (!resolved) return;
+    setSelectedLocalityIndex(index);
+    applyResolvedLocation(resolved);
+  };
+
+  // Marker-drag handler -- see AddPropertyPage.tsx's identical helper for
+  // the full rationale.
+  const handleMarkerMove = async (latitude: number, longitude: number) => {
+    updateLocation("latitude", latitude);
+    updateLocation("longitude", longitude);
+    setReverseGeocoding(true);
+    setGeoError(null);
+    try {
+      const resolved = await propertiesApi.reverseGeocode(latitude, longitude);
+      applyAddressFields(resolved);
+      setPinLookupStatus("success");
+      setPinLookupError(null);
+    } catch {
+      // Non-fatal -- the marker position already applied above stays put.
+    } finally {
+      setReverseGeocoding(false);
+    }
+  };
+
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
       setGeoStatus("Your browser doesn't support geolocation.");
@@ -169,9 +280,23 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
     setGeoStatus("Locating...");
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        updateLocation("latitude", position.coords.latitude);
-        updateLocation("longitude", position.coords.longitude);
-        setGeoStatus("Current location captured.");
+        const { latitude, longitude } = position.coords;
+        updateLocation("latitude", latitude);
+        updateLocation("longitude", longitude);
+        setGeoStatus("Current location captured -- looking up address...");
+        setReverseGeocoding(true);
+        setGeoError(null);
+        propertiesApi
+          .reverseGeocode(latitude, longitude)
+          .then((resolved) => {
+            applyAddressFields(resolved);
+            setPinLookupStatus("success");
+            setGeoStatus("Current location captured and address filled in.");
+          })
+          .catch(() => {
+            setGeoStatus("Current location captured. Could not auto-fill the address -- please fill it in manually.");
+          })
+          .finally(() => setReverseGeocoding(false));
       },
       () => setGeoStatus("Could not get your location. You can still enter the address manually."),
     );
@@ -184,10 +309,19 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
     return !normalized || normalized === "india" || normalized === "in";
   })();
 
+  const postalCodeInvalid = Boolean(values.location.postalCode) && values.location.postalCode!.length !== 6;
+
   const handlePostalCodeChange = (e: ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    const next = isIndianAddress ? raw.replace(/[^0-9]/g, "").slice(0, 6) : raw.slice(0, 20);
+    const next = isIndianAddress ? digitsOnly(raw).slice(0, 6) : raw.slice(0, 20);
     updateAddressField("postalCode", next || undefined);
+    setPinLookupStatus("idle");
+    setPinLookupError(null);
+    setLocalityOptions([]);
+    setSelectedLocalityIndex(null);
+    if (isIndianAddress && next.length === 6) {
+      void lookupPostalCode(next);
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -407,6 +541,56 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
       <div className="form-section">
         <h2>Location</h2>
         {geoError ? <div className="alert alert--error">{geoError}</div> : null}
+
+        {/* Phase 2 Part 1: PIN Code first -- see AddPropertyPage.tsx's
+            Address step for the full rationale. Auto-fills Country/State/
+            District/City/Locality below via lookupPostalCode. */}
+        <div className="field">
+          <label htmlFor="pf-postal-code">
+            PIN code <RequiredMark />
+          </label>
+          <input
+            id="pf-postal-code"
+            required
+            inputMode="numeric"
+            maxLength={isIndianAddress ? 6 : 20}
+            value={values.location.postalCode ?? ""}
+            onChange={handlePostalCodeChange}
+            onBlur={() => setPostalCodeTouched(true)}
+          />
+          {isIndianAddress && postalCodeTouched && postalCodeInvalid ? (
+            <span className="field-error">PIN code should be 6 digits.</span>
+          ) : pinLookupStatus === "loading" ? (
+            <span className="field-hint">Looking up this PIN code...</span>
+          ) : pinLookupStatus === "error" && pinLookupError ? (
+            <span className="field-error">{pinLookupError}</span>
+          ) : pinLookupStatus === "success" ? (
+            <span className="field-hint">Location found -- check the map below and adjust the pin if needed.</span>
+          ) : (
+            <span className="field-hint">{isIndianAddress ? "6-digit Indian PIN code" : "Postal / ZIP code"}</span>
+          )}
+        </div>
+
+        {localityOptions.length > 1 ? (
+          <div className="field">
+            <label htmlFor="pf-locality-choice">Which locality?</label>
+            <select
+              id="pf-locality-choice"
+              value={selectedLocalityIndex ?? ""}
+              onChange={(e) => selectLocalityOption(Number(e.target.value))}
+            >
+              <option value="" disabled>
+                Select the matching locality
+              </option>
+              {localityOptions.map((option, index) => (
+                <option key={`${option.locality ?? option.formattedAddress}-${index}`} value={index}>
+                  {option.locality ?? option.formattedAddress}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
         <div className="field">
           <label htmlFor="pf-address">
             Address Line <RequiredMark />
@@ -416,66 +600,58 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
             required
             minLength={5}
             value={values.location.addressLine}
-            onChange={(e) => updateAddressField("addressLine", e.target.value)}
+            onChange={(e) => updateLocation("addressLine", e.target.value)}
+            placeholder="Building name / Apartment / Shop name / House number"
           />
+          <span className="field-hint">Building name, apartment, shop name, or house number.</span>
         </div>
+
         <div className="form-grid">
           <div className="field">
             <label htmlFor="pf-locality">Locality</label>
-            <input
-              id="pf-locality"
-              value={values.location.locality ?? ""}
-              onChange={(e) => updateAddressField("locality", e.target.value || undefined)}
-            />
+            <input id="pf-locality" readOnly value={values.location.locality ?? ""} placeholder="Auto-filled from PIN code" />
           </div>
           <div className="field">
-            <label htmlFor="pf-city">
-              City <RequiredMark />
-            </label>
-            <input
-              id="pf-city"
-              required
-              minLength={2}
-              value={values.location.city}
-              onChange={(e) => updateAddressField("city", e.target.value)}
-            />
+            <label htmlFor="pf-city">City</label>
+            <input id="pf-city" readOnly value={values.location.city} placeholder="Auto-filled from PIN code" />
+          </div>
+          <div className="field">
+            <label htmlFor="pf-district">District</label>
+            <input id="pf-district" readOnly value={values.location.district ?? ""} placeholder="Auto-filled from PIN code" />
           </div>
           <div className="field">
             <label htmlFor="pf-state">State</label>
-            <input
-              id="pf-state"
-              value={values.location.state ?? ""}
-              onChange={(e) => updateAddressField("state", e.target.value || undefined)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="pf-postal-code">PIN code</label>
-            <input
-              id="pf-postal-code"
-              inputMode="numeric"
-              maxLength={isIndianAddress ? 6 : 20}
-              value={values.location.postalCode ?? ""}
-              onChange={handlePostalCodeChange}
-            />
-            <span className="field-hint">{isIndianAddress ? "6-digit Indian PIN code" : "Postal / ZIP code"}</span>
+            <input id="pf-state" readOnly value={values.location.state ?? ""} placeholder="Auto-filled from PIN code" />
           </div>
           <div className="field">
             <label htmlFor="pf-country">Country</label>
-            <input
-              id="pf-country"
-              value={values.location.country ?? ""}
-              onChange={(e) => updateAddressField("country", e.target.value || undefined)}
-            />
+            <input id="pf-country" readOnly value={values.location.country ?? ""} placeholder="Auto-filled from PIN code" />
           </div>
         </div>
+
         <button type="button" className="btn-v2 btn-v2--secondary btn-v2--sm" onClick={useCurrentLocation}>
           Use current location
         </button>
         {geoStatus ? <p className="field-hint">{geoStatus}</p> : null}
-        <p className="field-hint">
-          Leave latitude/longitude blank to have the address geocoded automatically from Address Line, Locality,
-          City, State, PIN code and Country.
-        </p>
+
+        {pinLookupStatus === "success" || pinLookupStatus === "error" || values.location.latitude !== undefined ? (
+          <div className="field">
+            <label>Map location {reverseGeocoding ? <span className="field-hint">(updating address...)</span> : null}</label>
+            <Suspense fallback={<p className="field-hint">Loading map...</p>}>
+              <AddressMap
+                position={
+                  values.location.latitude !== undefined && values.location.longitude !== undefined
+                    ? [values.location.latitude, values.location.longitude]
+                    : INDIA_CENTER
+                }
+                onMarkerMove={handleMarkerMove}
+              />
+            </Suspense>
+            <span className="field-hint">Drag the pin to set your exact location.</span>
+          </div>
+        ) : (
+          <p className="field-hint">Enter a PIN code above or use current location to show the map and place a marker.</p>
+        )}
       </div>
 
       <div className="form-section">

@@ -3,9 +3,11 @@ import {
   CreatePropertyPayload,
   PaginatedResult,
   PlatformStats,
+  PostalCodeLookupResult,
   PropertyCategory,
   PropertyDetail,
   PropertySummary,
+  ReverseGeocodeResult,
   SearchFilters,
   UpdatePropertyPayload,
 } from "./types";
@@ -54,6 +56,18 @@ export const propertiesApi = {
   getById: (id: string) => httpClient.get<PropertyDetail>(`/properties/${id}`, undefined, true),
 
   create: (payload: CreatePropertyPayload) => httpClient.post<PropertyDetail>("/properties", payload),
+
+  // Phase 2 Part 1 (PIN-first Address step). Public/no-auth, matching
+  // categories()/stats() -- a stateless third-party geocoding lookup.
+  geocodePostalCode: (postalCode: string, country?: string) =>
+    httpClient.get<{ items: PostalCodeLookupResult[] }>(
+      "/properties/geocode/postal-code",
+      { postalCode, country },
+      false,
+    ),
+
+  reverseGeocode: (lat: number, lng: number) =>
+    httpClient.get<ReverseGeocodeResult>("/properties/geocode/reverse", { lat, lng }, false),
 
   update: (id: string, payload: UpdatePropertyPayload) =>
     httpClient.patch<PropertyDetail>(`/properties/${id}`, payload),

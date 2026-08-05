@@ -1,4 +1,10 @@
-import { GeocodeAddressInput, GeocodeResult, IGeocodingService } from "@/domain/services/IGeocodingService";
+import {
+  GeocodeAddressInput,
+  GeocodeResult,
+  IGeocodingService,
+  PostalCodeLookupResult,
+  ReverseGeocodeResult,
+} from "@/domain/services/IGeocodingService";
 import { ValidationError } from "@/domain/errors/AppError";
 import { logger } from "@/infrastructure/logging/logger";
 
@@ -7,6 +13,41 @@ interface NominatimSearchResult {
   lat: string;
   lon: string;
   display_name: string;
+  address?: NominatimAddress;
+}
+
+/**
+ * Nominatim's addressdetails=1 breakdown -- only the fields this service
+ * actually reads. Nominatim doesn't have one fixed "district"/"city" key;
+ * which key a given result uses depends on how that area is mapped, hence
+ * reading a short fallback chain for each logical field below.
+ */
+interface NominatimAddress {
+  country?: string;
+  state?: string;
+  state_district?: string;
+  county?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+  municipality?: string;
+  suburb?: string;
+  neighbourhood?: string;
+  locality?: string;
+  hamlet?: string;
+  postcode?: string;
+}
+
+function extractDistrict(address?: NominatimAddress): string | null {
+  return address?.state_district ?? address?.county ?? null;
+}
+
+function extractCity(address?: NominatimAddress): string | null {
+  return address?.city ?? address?.town ?? address?.village ?? address?.municipality ?? null;
+}
+
+function extractLocality(address?: NominatimAddress): string | null {
+  return address?.suburb ?? address?.neighbourhood ?? address?.locality ?? address?.hamlet ?? null;
 }
 
 /**
@@ -33,6 +74,8 @@ interface NominatimSearchResult {
  */
 export class NominatimGeocodingService implements IGeocodingService {
   private static readonly BASE_URL = "https://nominatim.openstreetmap.org/search";
+  private static readonly REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
+  private static readonly USER_AGENT = "RentIt/1.0 (property listing geocoding; contact: support@rentit.example)";
 
   async geocode(input: GeocodeAddressInput): Promise<GeocodeResult> {
     const { addressLine, city, locality, state, postalCode, country } = input;
@@ -149,7 +192,122 @@ export class NominatimGeocodingService implements IGeocodingService {
     };
   }
 
+  /**
+   * PIN-code-first Address step (Phase 2 Part 1): resolves a postal code to
+   * every distinct locality Nominatim has for it, each with
+   * country/state/district/city/locality already broken out
+   * (addressdetails=1) so the frontend can auto-fill the Address step's
+   * fields with zero further requests, or offer a locality picker when more
+   * than one comes back. Deduped by locality+city+district, since Nominatim
+   * can return several near-identical points (different building footprints)
+   * inside what a user would consider the same locality.
+   */
+  async geocodeByPostalCode(postalCode: string, country?: string): Promise<PostalCodeLookupResult[]> {
+    const trimmed = postalCode.trim();
+    const normalizedCountry = country?.trim().toLowerCase();
+    const isIndia = !normalizedCountry || normalizedCountry === "india" || normalizedCountry === "in";
+
+    const params = new URLSearchParams({
+      format: "jsonv2",
+      addressdetails: "1",
+      limit: "20",
+      postalcode: trimmed,
+    });
+    if (country) params.set("country", country);
+    else if (isIndia) params.set("country", "India");
+    if (isIndia) params.set("countrycodes", "in");
+
+    logger.info({ postalCode: trimmed, country }, "PIN code lookup: querying Nominatim");
+
+    const results = await this.searchMany(params);
+
+    const seen = new Set<string>();
+    const candidates: PostalCodeLookupResult[] = [];
+    for (const result of results) {
+      const district = extractDistrict(result.address);
+      const city = extractCity(result.address);
+      const locality = extractLocality(result.address);
+      const state = result.address?.state ?? null;
+      const dedupeKey = `${locality ?? ""}|${city ?? ""}|${district ?? ""}|${state ?? ""}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+
+      candidates.push({
+        country: result.address?.country ?? (isIndia ? "India" : null),
+        state,
+        district,
+        city,
+        locality,
+        postalCode: result.address?.postcode ?? trimmed,
+        latitude: parseFloat(result.lat),
+        longitude: parseFloat(result.lon),
+        formattedAddress: result.display_name,
+      });
+    }
+
+    logger.info(
+      { postalCode: trimmed, candidateCount: candidates.length },
+      "PIN code lookup resolved",
+    );
+
+    return candidates;
+  }
+
+  /**
+   * "Drag the marker" / "Use current location": resolves a lat/lng pair back
+   * to country/state/district/city/locality via Nominatim's /reverse
+   * endpoint, so the Address step's fields stay in sync with wherever the
+   * marker actually is.
+   */
+  async reverseGeocode(latitude: number, longitude: number): Promise<ReverseGeocodeResult> {
+    const params = new URLSearchParams({
+      format: "jsonv2",
+      addressdetails: "1",
+      lat: String(latitude),
+      lon: String(longitude),
+    });
+
+    const url = new URL(NominatimGeocodingService.REVERSE_URL);
+    url.search = params.toString();
+
+    logger.info({ latitude, longitude }, "Reverse geocoding request to Nominatim");
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        "User-Agent": NominatimGeocodingService.USER_AGENT,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new ValidationError(`Reverse geocoding request failed with HTTP ${response.status}`);
+    }
+
+    const result = (await response.json()) as NominatimSearchResult & { error?: string };
+    if (!result || result.error || !result.lat || !result.lon) {
+      throw new ValidationError(
+        `Could not resolve an address for coordinates (${latitude}, ${longitude}).`,
+      );
+    }
+
+    return {
+      country: result.address?.country ?? null,
+      state: result.address?.state ?? null,
+      district: extractDistrict(result.address),
+      city: extractCity(result.address),
+      locality: extractLocality(result.address),
+      formattedAddress: result.display_name,
+      latitude: parseFloat(result.lat),
+      longitude: parseFloat(result.lon),
+    };
+  }
+
   private async searchOnce(params: URLSearchParams): Promise<NominatimSearchResult | null> {
+    const results = await this.searchMany(params);
+    return results.length > 0 ? results[0] : null;
+  }
+
+  private async searchMany(params: URLSearchParams): Promise<NominatimSearchResult[]> {
     const url = new URL(NominatimGeocodingService.BASE_URL);
     url.search = params.toString();
 
@@ -157,7 +315,7 @@ export class NominatimGeocodingService implements IGeocodingService {
       headers: {
         // Required by Nominatim's usage policy -- requests without a
         // descriptive User-Agent are liable to be blocked outright.
-        "User-Agent": "RentIt/1.0 (property listing geocoding; contact: support@rentit.example)",
+        "User-Agent": NominatimGeocodingService.USER_AGENT,
         Accept: "application/json",
       },
     });
@@ -167,6 +325,6 @@ export class NominatimGeocodingService implements IGeocodingService {
     }
 
     const results = (await response.json()) as NominatimSearchResult[];
-    return Array.isArray(results) && results.length > 0 ? results[0] : null;
+    return Array.isArray(results) ? results : [];
   }
 }

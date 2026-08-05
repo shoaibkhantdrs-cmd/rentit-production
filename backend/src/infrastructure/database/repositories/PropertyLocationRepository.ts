@@ -8,6 +8,7 @@ interface PropertyLocationRow {
   address_line: string;
   city: string;
   locality: string | null;
+  district: string | null;
   state: string | null;
   country: string | null;
   postal_code: string | null;
@@ -26,6 +27,7 @@ function toEntity(row: PropertyLocationRow): PropertyLocation {
     addressLine: row.address_line,
     city: row.city,
     locality: row.locality,
+    district: row.district,
     state: row.state,
     country: row.country,
     postalCode: row.postal_code,
@@ -61,13 +63,14 @@ export class PropertyLocationRepository implements IPropertyLocationRepository {
   async upsert(input: NewPropertyLocation): Promise<PropertyLocation> {
     const result = await this.pool.query<PropertyLocationRow>(
       `INSERT INTO property_locations (
-         property_id, address_line, city, locality, state, country, postal_code,
+         property_id, address_line, city, locality, district, state, country, postal_code,
          latitude, longitude, formatted_address, place_id
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT (property_id) DO UPDATE SET
          address_line = EXCLUDED.address_line,
          city = EXCLUDED.city,
          locality = EXCLUDED.locality,
+         district = EXCLUDED.district,
          state = EXCLUDED.state,
          country = EXCLUDED.country,
          postal_code = EXCLUDED.postal_code,
@@ -81,6 +84,7 @@ export class PropertyLocationRepository implements IPropertyLocationRepository {
         input.addressLine,
         input.city,
         input.locality,
+        input.district,
         input.state,
         input.country,
         input.postalCode,

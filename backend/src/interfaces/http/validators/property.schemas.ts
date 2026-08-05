@@ -33,6 +33,11 @@ const locationSchema = z.object({
   addressLine: z.string().min(5).max(300),
   city: z.string().min(2).max(120),
   locality: z.string().max(120).optional(),
+  // Phase 2 Part 1 (PIN-first Address step): auto-filled from the postal
+  // code / reverse-geocode lookup alongside state/city/country -- never
+  // typed by the user directly, but still a plain optional string here so
+  // older clients that never send it keep working unchanged.
+  district: z.string().max(120).optional(),
   state: z.string().max(120).optional(),
   country: z.string().max(120).optional(),
   postalCode: z.string().max(20).optional(),
@@ -130,4 +135,19 @@ export const paginationQuerySchema = z.object({
 // Phase 5 Part 7 (Recommendations).
 export const recommendationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(8),
+});
+
+// Phase 2 Part 1 (PIN-first Address step): postal-code-to-locality lookup
+// and marker-drag/current-location reverse geocoding. postalCode is kept as
+// a loose 3-10 char string (not hard-coded to 6 digits) so a non-Indian
+// postal code doesn't get rejected before it even reaches the geocoding
+// service, which already has its own India-detection heuristic.
+export const postalCodeLookupQuerySchema = z.object({
+  postalCode: z.string().trim().min(3).max(20),
+  country: z.string().trim().max(120).optional(),
+});
+
+export const reverseGeocodeQuerySchema = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
 });

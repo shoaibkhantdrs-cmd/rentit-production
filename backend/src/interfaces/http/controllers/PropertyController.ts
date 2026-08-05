@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { CreatePropertyUseCase } from "@/application/properties/CreateProperty.usecase";
+import { GeocodePostalCodeUseCase } from "@/application/properties/GeocodePostalCode.usecase";
+import { ReverseGeocodeLocationUseCase } from "@/application/properties/ReverseGeocodeLocation.usecase";
 import { GetPropertyUseCase } from "@/application/properties/GetProperty.usecase";
 import { SearchPropertiesUseCase } from "@/application/properties/SearchProperties.usecase";
 import { UpdatePropertyUseCase } from "@/application/properties/UpdateProperty.usecase";
@@ -24,11 +26,15 @@ import {
   reportPropertySchema,
   paginationQuerySchema,
   recommendationsQuerySchema,
+  postalCodeLookupQuerySchema,
+  reverseGeocodeQuerySchema,
 } from "@/interfaces/http/validators/property.schemas";
 
 export class PropertyController {
   constructor(
     private readonly createProperty: CreatePropertyUseCase,
+    private readonly geocodePostalCode: GeocodePostalCodeUseCase,
+    private readonly reverseGeocodeLocation: ReverseGeocodeLocationUseCase,
     private readonly getProperty: GetPropertyUseCase,
     private readonly searchProperties: SearchPropertiesUseCase,
     private readonly updateProperty: UpdatePropertyUseCase,
@@ -51,6 +57,21 @@ export class PropertyController {
     const body = req.body as z.infer<typeof createPropertySchema>;
     const result = await this.createProperty.execute({ ...body, ownerId: req.user.sub });
     res.status(201).json(result);
+  };
+
+  // Phase 2 Part 1: PIN-code-first Address step. Public/no-auth, same as
+  // categories/stats -- a stateless lookup against a third-party geocoder,
+  // no user data read or written.
+  geocodePostalCodeLookup = async (req: Request, res: Response): Promise<void> => {
+    const query = req.query as unknown as z.infer<typeof postalCodeLookupQuerySchema>;
+    const items = await this.geocodePostalCode.execute({ postalCode: query.postalCode, country: query.country });
+    res.status(200).json({ items });
+  };
+
+  reverseGeocodeLocationLookup = async (req: Request, res: Response): Promise<void> => {
+    const query = req.query as unknown as z.infer<typeof reverseGeocodeQuerySchema>;
+    const result = await this.reverseGeocodeLocation.execute({ latitude: query.lat, longitude: query.lng });
+    res.status(200).json(result);
   };
 
   search = async (req: Request, res: Response): Promise<void> => {

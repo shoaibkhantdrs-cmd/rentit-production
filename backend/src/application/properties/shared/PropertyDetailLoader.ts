@@ -182,6 +182,7 @@ export class PropertyDetailLoader {
             addressLine: location.addressLine,
             city: location.city,
             locality: location.locality,
+            district: location.district,
             state: location.state,
             country: location.country,
             postalCode: location.postalCode,

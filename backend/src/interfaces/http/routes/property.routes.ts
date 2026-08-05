@@ -14,6 +14,8 @@ import {
   propertyIdParamSchema,
   propertyImageParamSchema,
   recommendationsQuerySchema,
+  postalCodeLookupQuerySchema,
+  reverseGeocodeQuerySchema,
 } from "@/interfaces/http/validators/property.schemas";
 
 export function createPropertyRouter(
@@ -62,6 +64,23 @@ export function createPropertyRouter(
     authenticate,
     validate(recommendationsQuerySchema, "query"),
     asyncHandler(controller.recommendationsForMe),
+  );
+
+  // Phase 2 Part 1 (PIN-first Address step): must come before "/:id" for the
+  // same route-ordering reason as "/mine"/"/favorites"/"/categories" above --
+  // "/geocode/postal-code" and "/geocode/reverse" are two-segment paths so
+  // they'd never actually collide with the one-segment "/:id" pattern, but
+  // keeping them grouped with the other pre-"/:id" routes avoids relying on
+  // that being obvious later.
+  router.get(
+    "/geocode/postal-code",
+    validate(postalCodeLookupQuerySchema, "query"),
+    asyncHandler(controller.geocodePostalCodeLookup),
+  );
+  router.get(
+    "/geocode/reverse",
+    validate(reverseGeocodeQuerySchema, "query"),
+    asyncHandler(controller.reverseGeocodeLocationLookup),
   );
 
   router.get("/", validate(searchPropertiesQuerySchema, "query"), asyncHandler(controller.search));

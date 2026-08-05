@@ -4,6 +4,7 @@ export interface PropertyLocation {
   addressLine: string;
   city: string;
   locality: string | null;
+  district: string | null;
   state: string | null;
   country: string | null;
   postalCode: string | null;

@@ -39,6 +39,7 @@ export interface UpdatePropertyInput {
     addressLine?: string;
     city?: string;
     locality?: string;
+    district?: string;
     state?: string;
     country?: string;
     postalCode?: string;
@@ -190,6 +191,7 @@ export class UpdatePropertyUseCase {
         addressLine,
         city,
         locality: input.location.locality ?? current?.locality ?? null,
+        district: input.location.district ?? current?.district ?? null,
         state: input.location.state ?? current?.state ?? null,
         country: input.location.country ?? current?.country ?? null,
         postalCode: input.location.postalCode ?? current?.postalCode ?? null,
