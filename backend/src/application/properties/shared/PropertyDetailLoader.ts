@@ -162,6 +162,14 @@ export class PropertyDetailLoader {
       publishedAt: property.publishedAt,
       createdAt: property.createdAt,
       updatedAt: property.updatedAt,
+      frontWidthFt: property.frontWidthFt,
+      shopDepthFt: property.shopDepthFt,
+      roadWidthFt: property.roadWidthFt,
+      powerLoad: property.powerLoad,
+      isCornerShop: property.isCornerShop,
+      hasWashroom: property.hasWashroom,
+      readyToMove: property.readyToMove,
+      suitableFor: property.suitableFor ?? [],
       category: category ? { id: category.id, name: category.name, slug: category.slug } : null,
       owner: owner
         ? {

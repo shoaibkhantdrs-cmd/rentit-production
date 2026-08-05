@@ -37,6 +37,17 @@ export interface CreatePropertyInput {
     latitude?: number;
     longitude?: number;
   };
+  // Phase 2 Part 2 (Shop Listing UI). Only meaningful when propertyType ===
+  // "shop" -- stored as null for every other property type, same as
+  // floorNumber/totalFloors/facing above.
+  frontWidthFt?: number | null;
+  shopDepthFt?: number | null;
+  roadWidthFt?: number | null;
+  powerLoad?: string | null;
+  isCornerShop?: boolean | null;
+  hasWashroom?: boolean | null;
+  readyToMove?: boolean | null;
+  suitableFor?: string[] | null;
 }
 
 export class CreatePropertyUseCase {
@@ -73,6 +84,14 @@ export class CreatePropertyUseCase {
       facing: input.facing ?? null,
       furnishedStatus: input.furnishedStatus,
       availableFrom: input.availableFrom,
+      frontWidthFt: input.frontWidthFt ?? null,
+      shopDepthFt: input.shopDepthFt ?? null,
+      roadWidthFt: input.roadWidthFt ?? null,
+      powerLoad: input.powerLoad ?? null,
+      isCornerShop: input.isCornerShop ?? null,
+      hasWashroom: input.hasWashroom ?? null,
+      readyToMove: input.readyToMove ?? null,
+      suitableFor: input.suitableFor ?? null,
     });
 
     let latitude = input.location.latitude;

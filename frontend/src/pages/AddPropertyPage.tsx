@@ -28,6 +28,7 @@ import {
   PropertyDetail,
   PropertyType,
   ReverseGeocodeResult,
+  SUITABLE_FOR_KEYS,
 } from "@/api/types";
 import { ApiError } from "@/api/httpClient";
 import { Chip } from "@/components/ui/Chip";
@@ -260,12 +261,20 @@ function PropertyWizard() {
   const [bedroomsText, setBedroomsText] = useState(values.bedrooms ? String(values.bedrooms) : "");
   const [bathroomsText, setBathroomsText] = useState(values.bathrooms ? String(values.bathrooms) : "");
   const [parkingText, setParkingText] = useState(values.parkingSpaces ? String(values.parkingSpaces) : "");
+  // Phase 2 Part 2 (Shop Listing UI): same display-only-text-shadowing-a-
+  // real-number pattern as rentText/areaText/etc. above, for the three new
+  // shop-only numeric measurements.
+  const [frontWidthText, setFrontWidthText] = useState(values.frontWidthFt ? String(values.frontWidthFt) : "");
+  const [shopDepthText, setShopDepthText] = useState(values.shopDepthFt ? String(values.shopDepthFt) : "");
+  const [roadWidthText, setRoadWidthText] = useState(values.roadWidthFt ? String(values.roadWidthFt) : "");
 
   // Pricing & size validation now happens only when Next is clicked (see
   // goNext), with inline messages here instead of a silently-disabled
   // button -- the same silent-disable pattern that caused the Step 0
   // Next-button bug is exactly what this avoids for Step 3.
-  const [step3Errors, setStep3Errors] = useState<Partial<Record<"rentAmount" | "areaSqft" | "availableFrom", string>>>({});
+  const [step3Errors, setStep3Errors] = useState<
+    Partial<Record<"rentAmount" | "areaSqft" | "availableFrom" | "floorNumber", string>>
+  >({});
 
   useEffect(() => {
     // Bug fix (QA report #8): a failed fetch used to silently resolve to
@@ -323,24 +332,54 @@ function PropertyWizard() {
       return { ...prev, features: current.includes(feature) ? current.filter((f) => f !== feature) : [...current, feature] };
     });
 
+  // Phase 2 Part 2 (Shop Listing UI): same toggle pattern as toggleFeature
+  // above, for the "Suitable For" multi-select.
+  const toggleSuitableFor = (tag: string) =>
+    setValues((prev) => {
+      const current = prev.suitableFor ?? [];
+      return { ...prev, suitableFor: current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag] };
+    });
+
   const digitsOnly = (raw: string) => raw.replace(/[^0-9]/g, "");
 
-  // Shared onChange for the six Pricing & size numeric fields: strips
-  // anything that isn't a digit (so users can only ever type digits, per
-  // spec), keeps the field's own display text in sync, and updates the
-  // real numeric value used by the create-property payload. Clears that
+  // Shared onChange for the Pricing & size numeric fields: strips anything
+  // that isn't a digit (so users can only ever type digits, per spec),
+  // keeps the field's own display text in sync, and updates the real
+  // numeric value used by the create-property payload. Clears that
   // field's step3Errors entry the moment it's no longer empty, so the
   // error disappears as soon as it's fixed rather than lingering until
   // the next Next click.
   const handleNumericField =
     (
       setText: (v: string) => void,
-      key: "rentAmount" | "securityDeposit" | "areaSqft" | "bedrooms" | "bathrooms" | "parkingSpaces",
+      key:
+        | "rentAmount"
+        | "securityDeposit"
+        | "areaSqft"
+        | "bedrooms"
+        | "bathrooms"
+        | "parkingSpaces"
+        // Phase 2 Part 2 (Shop Listing UI).
+        | "frontWidthFt"
+        | "shopDepthFt"
+        | "roadWidthFt",
     ) =>
     (e: ChangeEvent<HTMLInputElement>) => {
       const digits = digitsOnly(e.target.value);
       setText(digits);
-      update(key, digits === "" ? 0 : Number(digits));
+      if (digits === "") {
+        // rentAmount/securityDeposit/areaSqft/bedrooms/bathrooms/parkingSpaces
+        // are required `number` fields on WizardValues (see the comment
+        // above rentText's declaration) -- an empty field means "0" for
+        // those. frontWidthFt/shopDepthFt/roadWidthFt are optional
+        // shop-only fields (`number | undefined`), so an empty field there
+        // means "not provided" rather than "0 ft", matching how
+        // floorNumber/totalFloors already treat blank as `undefined` below.
+        const isOptionalShopField = key === "frontWidthFt" || key === "shopDepthFt" || key === "roadWidthFt";
+        update(key, isOptionalShopField ? undefined : 0);
+      } else {
+        update(key, Number(digits));
+      }
       if (key === "rentAmount" || key === "areaSqft") {
         setStep3Errors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
       }
@@ -533,6 +572,12 @@ function PropertyWizard() {
 
   const locked = createdProperty !== null; // steps 0-3 become read-only once the draft is created server-side
 
+  // Phase 2 Part 2 (Shop Listing UI): drives the Pricing & size step's
+  // conditional field show/hide + relabeling. Every other property type
+  // (apartment/house/villa/pg/room/studio/commercial/other) renders the
+  // Pricing & size step exactly as before -- untouched.
+  const isShop = values.propertyType === "shop";
+
   const stepValid = useMemo(() => {
     switch (step) {
       case 0:
@@ -561,8 +606,19 @@ function PropertyWizard() {
   const goNext = async () => {
     if (step === 3) {
       const errors: typeof step3Errors = {};
-      if (!rentText.trim()) errors.rentAmount = "Monthly rent is required.";
-      if (!areaText.trim()) errors.areaSqft = "Area is required.";
+      // Phase 2 Part 2 (Shop Listing UI) validation: Residential keeps the
+      // existing rentAmount/areaSqft/availableFrom requirement exactly as
+      // before. Shop listings require only Shop Carpet Area (areaSqft --
+      // still enforced below for every type) and Floor (floorNumber, new
+      // requirement below) -- rentAmount is NOT required for a shop per
+      // spec ("Everything else optional"); it still defaults to 0 via
+      // handleNumericField, which the backend's `rentAmount: z.number()
+      // .min(0)` happily accepts. Address/PIN Code are already required
+      // for every property type on the Address step (step 1), so no
+      // change is needed there for shop.
+      if (!isShop && !rentText.trim()) errors.rentAmount = "Monthly rent is required.";
+      if (!areaText.trim()) errors.areaSqft = isShop ? "Shop carpet area is required." : "Area is required.";
+      if (isShop && values.floorNumber === undefined) errors.floorNumber = "Floor is required for shop listings.";
       if (!values.availableFrom) errors.availableFrom = "Available-from date is required.";
       setStep3Errors(errors);
       if (Object.keys(errors).length > 0) return;
@@ -930,13 +986,16 @@ function PropertyWizard() {
                 </div>
               </div>
               <div className="field">
-                <label htmlFor="w-area">Area (sqft)</label>
+                {/* Phase 2 Part 2 (Shop Listing UI): "Shop Carpet Area" for
+                    shop listings reuses this same areaSqft field/input --
+                    only the label and placeholder change. */}
+                <label htmlFor="w-area">{isShop ? <>Shop Carpet Area (sqft) <RequiredMark /></> : "Area (sqft)"}</label>
                 <input
                   id="w-area"
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  placeholder="Example: 1200"
+                  placeholder={isShop ? "Example: 350" : "Example: 1200"}
                   disabled={locked}
                   value={areaText}
                   onChange={handleNumericField(setAreaText, "areaSqft")}
@@ -948,32 +1007,42 @@ function PropertyWizard() {
                 <input id="w-available" type="date" required disabled={locked} value={values.availableFrom} onChange={(e) => update("availableFrom", e.target.value)} />
                 {step3Errors.availableFrom ? <span className="field-error">{step3Errors.availableFrom}</span> : null}
               </div>
-              <div className="field">
-                <label htmlFor="w-bedrooms">Bedrooms</label>
-                <input
-                  id="w-bedrooms"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  placeholder="Example: 2"
-                  disabled={locked}
-                  value={bedroomsText}
-                  onChange={handleNumericField(setBedroomsText, "bedrooms")}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="w-bathrooms">Bathrooms</label>
-                <input
-                  id="w-bathrooms"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  placeholder="Example: 2"
-                  disabled={locked}
-                  value={bathroomsText}
-                  onChange={handleNumericField(setBathroomsText, "bathrooms")}
-                />
-              </div>
+              {/* Phase 2 Part 2 (Shop Listing UI): Bedrooms/Bathrooms/
+                  Furnished status/Total floors are hidden entirely for
+                  shop listings -- not applicable to a shop, per spec.
+                  Parking spaces and Facing stay visible for every property
+                  type, shop included -- the spec's hide list doesn't
+                  mention either. */}
+              {!isShop && (
+                <div className="field">
+                  <label htmlFor="w-bedrooms">Bedrooms</label>
+                  <input
+                    id="w-bedrooms"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="Example: 2"
+                    disabled={locked}
+                    value={bedroomsText}
+                    onChange={handleNumericField(setBedroomsText, "bedrooms")}
+                  />
+                </div>
+              )}
+              {!isShop && (
+                <div className="field">
+                  <label htmlFor="w-bathrooms">Bathrooms</label>
+                  <input
+                    id="w-bathrooms"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="Example: 2"
+                    disabled={locked}
+                    value={bathroomsText}
+                    onChange={handleNumericField(setBathroomsText, "bathrooms")}
+                  />
+                </div>
+              )}
               <div className="field">
                 <label htmlFor="w-parking">Parking spaces</label>
                 <input
@@ -987,22 +1056,39 @@ function PropertyWizard() {
                   onChange={handleNumericField(setParkingText, "parkingSpaces")}
                 />
               </div>
+              {!isShop && (
+                <div className="field">
+                  <label htmlFor="w-furnished">Furnished status</label>
+                  <select id="w-furnished" disabled={locked} value={values.furnishedStatus} onChange={(e) => update("furnishedStatus", e.target.value as FurnishedStatus)}>
+                    {FURNISHED.map((f) => (
+                      <option key={f} value={f}>{f.replace("_", " ")}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="field">
-                <label htmlFor="w-furnished">Furnished status</label>
-                <select id="w-furnished" disabled={locked} value={values.furnishedStatus} onChange={(e) => update("furnishedStatus", e.target.value as FurnishedStatus)}>
-                  {FURNISHED.map((f) => (
-                    <option key={f} value={f}>{f.replace("_", " ")}</option>
-                  ))}
-                </select>
+                {/* "Floor" for shop listings reuses this same floorNumber
+                    field/input, and becomes required (spec: Shop requires
+                    Shop Carpet Area, Floor, Address, PIN Code). */}
+                <label htmlFor="w-floor">{isShop ? <>Floor <RequiredMark /></> : "Floor number"}</label>
+                <input
+                  id="w-floor"
+                  type="number"
+                  disabled={locked}
+                  value={values.floorNumber ?? ""}
+                  onChange={(e) => {
+                    update("floorNumber", e.target.value === "" ? undefined : Number(e.target.value));
+                    if (step3Errors.floorNumber) setStep3Errors((prev) => ({ ...prev, floorNumber: undefined }));
+                  }}
+                />
+                {step3Errors.floorNumber ? <span className="field-error">{step3Errors.floorNumber}</span> : null}
               </div>
-              <div className="field">
-                <label htmlFor="w-floor">Floor number</label>
-                <input id="w-floor" type="number" disabled={locked} value={values.floorNumber ?? ""} onChange={(e) => update("floorNumber", e.target.value === "" ? undefined : Number(e.target.value))} />
-              </div>
-              <div className="field">
-                <label htmlFor="w-total-floors">Total floors</label>
-                <input id="w-total-floors" type="number" disabled={locked} value={values.totalFloors ?? ""} onChange={(e) => update("totalFloors", e.target.value === "" ? undefined : Number(e.target.value))} />
-              </div>
+              {!isShop && (
+                <div className="field">
+                  <label htmlFor="w-total-floors">Total floors</label>
+                  <input id="w-total-floors" type="number" disabled={locked} value={values.totalFloors ?? ""} onChange={(e) => update("totalFloors", e.target.value === "" ? undefined : Number(e.target.value))} />
+                </div>
+              )}
               <div className="field">
                 <label htmlFor="w-facing">Facing</label>
                 <select id="w-facing" disabled={locked} value={values.facing ?? ""} onChange={(e) => update("facing", (e.target.value || undefined) as Facing | undefined)}>
@@ -1012,7 +1098,120 @@ function PropertyWizard() {
                   ))}
                 </select>
               </div>
+
+              {/* Phase 2 Part 2 (Shop Listing UI): shop-only fields, shown
+                  only when propertyType === "shop". All optional (spec:
+                  "Everything else optional" beyond Shop Carpet Area/Floor/
+                  Address/PIN Code, which are handled above/in the Address
+                  step). */}
+              {isShop && (
+                <>
+                  <div className="field">
+                    <label htmlFor="w-front-width">Front width (ft)</label>
+                    <input
+                      id="w-front-width"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="Example: 20"
+                      disabled={locked}
+                      value={frontWidthText}
+                      onChange={handleNumericField(setFrontWidthText, "frontWidthFt")}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="w-shop-depth">Shop depth (ft)</label>
+                    <input
+                      id="w-shop-depth"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="Example: 30"
+                      disabled={locked}
+                      value={shopDepthText}
+                      onChange={handleNumericField(setShopDepthText, "shopDepthFt")}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="w-road-width">Road width (ft)</label>
+                    <input
+                      id="w-road-width"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="Example: 40"
+                      disabled={locked}
+                      value={roadWidthText}
+                      onChange={handleNumericField(setRoadWidthText, "roadWidthFt")}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="w-power-load">Power load</label>
+                    <input
+                      id="w-power-load"
+                      type="text"
+                      placeholder="Example: 5 kW / 3-phase"
+                      maxLength={60}
+                      disabled={locked}
+                      value={values.powerLoad ?? ""}
+                      onChange={(e) => update("powerLoad", e.target.value === "" ? undefined : e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="w-corner-shop">Corner shop</label>
+                    <select
+                      id="w-corner-shop"
+                      disabled={locked}
+                      value={values.isCornerShop === undefined ? "" : values.isCornerShop ? "yes" : "no"}
+                      onChange={(e) => update("isCornerShop", e.target.value === "" ? undefined : e.target.value === "yes")}
+                    >
+                      <option value="">Not specified</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="w-washroom">Washroom</label>
+                    <select
+                      id="w-washroom"
+                      disabled={locked}
+                      value={values.hasWashroom === undefined ? "" : values.hasWashroom ? "yes" : "no"}
+                      onChange={(e) => update("hasWashroom", e.target.value === "" ? undefined : e.target.value === "yes")}
+                    >
+                      <option value="">Not specified</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="w-ready-to-move">Ready to move</label>
+                    <select
+                      id="w-ready-to-move"
+                      disabled={locked}
+                      value={values.readyToMove === undefined ? "" : values.readyToMove ? "yes" : "no"}
+                      onChange={(e) => update("readyToMove", e.target.value === "" ? undefined : e.target.value === "yes")}
+                    >
+                      <option value="">Not specified</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
+
+            {isShop && (
+              <div className="field" style={{ marginTop: "var(--space-4, 1rem)" }}>
+                <label>Suitable for</label>
+                <div className="chip-row">
+                  {SUITABLE_FOR_KEYS.map((tag) => (
+                    <Chip key={tag} active={(values.suitableFor ?? []).includes(tag)} onClick={() => !locked && toggleSuitableFor(tag)}>
+                      {tag.replace(/_/g, " ")}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

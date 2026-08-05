@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PROPERTY_FEATURE_KEYS } from "@/domain/entities/PropertyFeature";
+import { SUITABLE_FOR_KEYS } from "@/domain/entities/ShopSuitability";
 
 const propertyTypeEnum = z.enum([
   "apartment",
@@ -27,6 +28,8 @@ const facingEnum = z.enum([
 const furnishedStatusEnum = z.enum(["unfurnished", "semi_furnished", "fully_furnished"]);
 const statusEnum = z.enum(["draft", "pending_review", "published", "rented", "inactive", "removed"]);
 const featureKeyEnum = z.enum(PROPERTY_FEATURE_KEYS);
+// Phase 2 Part 2 (Shop Listing UI).
+const suitableForEnum = z.enum(SUITABLE_FOR_KEYS);
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be an ISO date (YYYY-MM-DD)");
 
 const locationSchema = z.object({
@@ -45,25 +48,66 @@ const locationSchema = z.object({
   longitude: z.number().min(-180).max(180).optional(),
 });
 
-export const createPropertySchema = z.object({
-  title: z.string().min(5).max(200),
-  description: z.string().min(20).max(5000),
-  categoryId: z.string().uuid(),
-  propertyType: propertyTypeEnum,
-  rentAmount: z.number().min(0),
-  securityDeposit: z.number().min(0).default(0),
-  areaSqft: z.number().positive(),
-  bedrooms: z.number().int().min(0).default(0),
-  bathrooms: z.number().int().min(0).default(0),
-  parkingSpaces: z.number().int().min(0).default(0),
-  floorNumber: z.number().int().optional(),
-  totalFloors: z.number().int().optional(),
-  facing: facingEnum.optional(),
-  furnishedStatus: furnishedStatusEnum.default("unfurnished"),
-  availableFrom: dateOnly,
-  features: z.array(featureKeyEnum).max(20).optional(),
-  location: locationSchema,
-});
+export const createPropertySchema = z
+  .object({
+    title: z.string().min(5).max(200),
+    description: z.string().min(20).max(5000),
+    categoryId: z.string().uuid(),
+    propertyType: propertyTypeEnum,
+    rentAmount: z.number().min(0),
+    securityDeposit: z.number().min(0).default(0),
+    // Reused as "Shop Carpet Area" for propertyType "shop" (Phase 2 Part 2)
+    // -- already required/positive for every property type, so no extra
+    // shop-specific requirement is needed here.
+    areaSqft: z.number().positive(),
+    bedrooms: z.number().int().min(0).default(0),
+    bathrooms: z.number().int().min(0).default(0),
+    parkingSpaces: z.number().int().min(0).default(0),
+    // Reused as "Floor" for propertyType "shop" -- optional here (matches
+    // every other property type), made conditionally required by the
+    // superRefine below only when propertyType === "shop".
+    floorNumber: z.number().int().optional(),
+    totalFloors: z.number().int().optional(),
+    facing: facingEnum.optional(),
+    furnishedStatus: furnishedStatusEnum.default("unfurnished"),
+    availableFrom: dateOnly,
+    features: z.array(featureKeyEnum).max(20).optional(),
+    location: locationSchema,
+    // Phase 2 Part 2 (Shop Listing UI): shop-only fields. Present on the
+    // schema for every property type (so a client never gets a "not
+    // recognized" 400 for sending them), but only meaningful/validated
+    // when propertyType === "shop" -- see CreateProperty.usecase.ts, which
+    // simply stores them as null for every other type.
+    frontWidthFt: z.number().min(0).optional(),
+    shopDepthFt: z.number().min(0).optional(),
+    roadWidthFt: z.number().min(0).optional(),
+    powerLoad: z.string().max(60).optional(),
+    isCornerShop: z.boolean().optional(),
+    hasWashroom: z.boolean().optional(),
+    readyToMove: z.boolean().optional(),
+    suitableFor: z.array(suitableForEnum).max(SUITABLE_FOR_KEYS.length).optional(),
+  })
+  // Shop listings require only Shop Carpet Area (areaSqft, already
+  // required above for every type), Floor (floorNumber), Address
+  // (location.addressLine, already required above), and PIN Code
+  // (location.postalCode) -- everything else shop-specific stays optional.
+  .superRefine((data, ctx) => {
+    if (data.propertyType !== "shop") return;
+    if (data.floorNumber === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["floorNumber"],
+        message: "Floor is required for shop listings",
+      });
+    }
+    if (!data.location.postalCode || !data.location.postalCode.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["location", "postalCode"],
+        message: "PIN code is required for shop listings",
+      });
+    }
+  });
 
 export const updatePropertySchema = z.object({
   title: z.string().min(5).max(200).optional(),
@@ -84,6 +128,17 @@ export const updatePropertySchema = z.object({
   availableFrom: dateOnly.optional(),
   features: z.array(featureKeyEnum).max(20).optional(),
   location: locationSchema.partial().optional(),
+  // Phase 2 Part 2 (Shop Listing UI). Not conditionally required on update
+  // -- a partial edit (e.g. photos-only) shouldn't be blocked by an
+  // unrelated shop field being absent from this particular request.
+  frontWidthFt: z.number().min(0).nullable().optional(),
+  shopDepthFt: z.number().min(0).nullable().optional(),
+  roadWidthFt: z.number().min(0).nullable().optional(),
+  powerLoad: z.string().max(60).nullable().optional(),
+  isCornerShop: z.boolean().nullable().optional(),
+  hasWashroom: z.boolean().nullable().optional(),
+  readyToMove: z.boolean().nullable().optional(),
+  suitableFor: z.array(suitableForEnum).max(SUITABLE_FOR_KEYS.length).nullable().optional(),
 });
 
 export const searchPropertiesQuerySchema = z.object({

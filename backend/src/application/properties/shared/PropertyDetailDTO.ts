@@ -22,6 +22,17 @@ export interface PropertyDetailDTO {
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  // Phase 2 Part 2 (Shop Listing UI): null for every non-shop listing.
+  // suitableFor defaults to [] (not null) to match the `features: string[]`
+  // pattern below -- see PropertyDetailLoader.assemble().
+  frontWidthFt: number | null;
+  shopDepthFt: number | null;
+  roadWidthFt: number | null;
+  powerLoad: string | null;
+  isCornerShop: boolean | null;
+  hasWashroom: boolean | null;
+  readyToMove: boolean | null;
+  suitableFor: string[];
   category: { id: string; name: string; slug: string } | null;
   owner: {
     id: string;

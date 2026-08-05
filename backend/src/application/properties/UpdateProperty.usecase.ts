@@ -46,6 +46,15 @@ export interface UpdatePropertyInput {
     latitude?: number;
     longitude?: number;
   };
+  // Phase 2 Part 2 (Shop Listing UI).
+  frontWidthFt?: number | null;
+  shopDepthFt?: number | null;
+  roadWidthFt?: number | null;
+  powerLoad?: string | null;
+  isCornerShop?: boolean | null;
+  hasWashroom?: boolean | null;
+  readyToMove?: boolean | null;
+  suitableFor?: string[] | null;
 }
 
 export class UpdatePropertyUseCase {
@@ -84,6 +93,14 @@ export class UpdatePropertyUseCase {
       "facing",
       "furnishedStatus",
       "availableFrom",
+      "frontWidthFt",
+      "shopDepthFt",
+      "roadWidthFt",
+      "powerLoad",
+      "isCornerShop",
+      "hasWashroom",
+      "readyToMove",
+      "suitableFor",
     ];
     for (const field of fields) {
       const value = input[field];

@@ -58,6 +58,24 @@ export const PROPERTY_FEATURE_KEYS = [
 
 export type PropertyFeatureKey = (typeof PROPERTY_FEATURE_KEYS)[number];
 
+// Phase 2 Part 2 (Shop Listing UI): mirrors
+// backend/src/domain/entities/ShopSuitability.ts's SUITABLE_FOR_KEYS.
+export const SUITABLE_FOR_KEYS = [
+  "retail",
+  "clothing",
+  "mobile",
+  "electronics",
+  "medical",
+  "restaurant",
+  "office",
+  "salon",
+  "coaching",
+  "warehouse",
+  "other",
+] as const;
+
+export type SuitableForKey = (typeof SUITABLE_FOR_KEYS)[number];
+
 export interface PropertyCategory {
   id: string;
   name: string;
@@ -141,6 +159,15 @@ export interface PropertyDetail {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // Phase 2 Part 2 (Shop Listing UI): null for every non-shop listing.
+  frontWidthFt: number | null;
+  shopDepthFt: number | null;
+  roadWidthFt: number | null;
+  powerLoad: string | null;
+  isCornerShop: boolean | null;
+  hasWashroom: boolean | null;
+  readyToMove: boolean | null;
+  suitableFor: string[];
   category: { id: string; name: string; slug: string } | null;
   owner: {
     id: string;
@@ -248,6 +275,16 @@ export interface CreatePropertyPayload {
   availableFrom: string;
   features?: string[];
   location: PropertyFormLocationInput;
+  // Phase 2 Part 2 (Shop Listing UI). Only meaningful when propertyType ===
+  // "shop"; omitted (undefined) for every other property type.
+  frontWidthFt?: number;
+  shopDepthFt?: number;
+  roadWidthFt?: number;
+  powerLoad?: string;
+  isCornerShop?: boolean;
+  hasWashroom?: boolean;
+  readyToMove?: boolean;
+  suitableFor?: string[];
 }
 
 // Bug fix (QA report #14 + #15): this used to type `status` as the full

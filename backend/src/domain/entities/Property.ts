@@ -57,6 +57,21 @@ export interface Property {
   moderatedBy: string | null;
   moderatedAt: Date | null;
   rejectionReason: string | null;
+  /**
+   * Phase 2 Part 2 (Shop Listing UI): shop-specific measurements/amenities.
+   * Always present (never `undefined`) but null for every non-shop listing
+   * (and for a shop listing where the owner left an optional field blank) --
+   * "Shop Carpet Area" and "Floor" deliberately reuse the existing
+   * `areaSqft`/`floorNumber` fields above instead of duplicating them here.
+   */
+  frontWidthFt: number | null;
+  shopDepthFt: number | null;
+  roadWidthFt: number | null;
+  powerLoad: string | null;
+  isCornerShop: boolean | null;
+  hasWashroom: boolean | null;
+  readyToMove: boolean | null;
+  suitableFor: string[] | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -78,7 +93,22 @@ export type NewProperty = Pick<
   | "furnishedStatus"
   | "availableFrom"
 > &
-  Partial<Pick<Property, "floorNumber" | "totalFloors" | "facing">>;
+  Partial<
+    Pick<
+      Property,
+      | "floorNumber"
+      | "totalFloors"
+      | "facing"
+      | "frontWidthFt"
+      | "shopDepthFt"
+      | "roadWidthFt"
+      | "powerLoad"
+      | "isCornerShop"
+      | "hasWashroom"
+      | "readyToMove"
+      | "suitableFor"
+    >
+  >;
 
 export interface PropertyUpdatePatch {
   title?: string;
@@ -104,4 +134,12 @@ export interface PropertyUpdatePatch {
   moderatedBy?: string | null;
   moderatedAt?: Date | null;
   rejectionReason?: string | null;
+  frontWidthFt?: number | null;
+  shopDepthFt?: number | null;
+  roadWidthFt?: number | null;
+  powerLoad?: string | null;
+  isCornerShop?: boolean | null;
+  hasWashroom?: boolean | null;
+  readyToMove?: boolean | null;
+  suitableFor?: string[] | null;
 }

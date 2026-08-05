@@ -11,6 +11,7 @@ import {
   PropertyDetail,
   PropertyType,
   ReverseGeocodeResult,
+  SUITABLE_FOR_KEYS,
 } from "@/api/types";
 import { lazyNamed } from "@/utils/lazyNamed";
 
@@ -95,6 +96,15 @@ function buildInitialValues(initial?: PropertyDetail): PropertyFormValues {
     furnishedStatus: initial.furnishedStatus,
     availableFrom: initial.availableFrom,
     features: initial.features,
+    // Phase 2 Part 2 (Shop Listing UI).
+    frontWidthFt: initial.frontWidthFt ?? undefined,
+    shopDepthFt: initial.shopDepthFt ?? undefined,
+    roadWidthFt: initial.roadWidthFt ?? undefined,
+    powerLoad: initial.powerLoad ?? undefined,
+    isCornerShop: initial.isCornerShop ?? undefined,
+    hasWashroom: initial.hasWashroom ?? undefined,
+    readyToMove: initial.readyToMove ?? undefined,
+    suitableFor: initial.suitableFor,
     location: {
       addressLine: initial.location?.addressLine ?? "",
       city: initial.location?.city ?? "",
@@ -135,6 +145,12 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
   const [selectedLocalityIndex, setSelectedLocalityIndex] = useState<number | null>(null);
   const [reverseGeocoding, setReverseGeocoding] = useState(false);
   const [postalCodeTouched, setPostalCodeTouched] = useState(false);
+
+  // Phase 2 Part 2 (Shop Listing UI): drives the Pricing & size section's
+  // conditional field show/hide + relabeling, mirroring
+  // AddPropertyPage.tsx's wizard. Every other property type renders this
+  // section exactly as before -- untouched.
+  const isShop = values.propertyType === "shop";
 
   useEffect(() => {
     propertiesApi
@@ -178,6 +194,16 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
         ? current.filter((f) => f !== feature)
         : [...current, feature];
       return { ...prev, features: next };
+    });
+  };
+
+  // Phase 2 Part 2 (Shop Listing UI): same toggle pattern as toggleFeature
+  // above, for the "Suitable For" multi-select.
+  const toggleSuitableFor = (tag: string) => {
+    setValues((prev) => {
+      const current = prev.suitableFor ?? [];
+      const next = current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag];
+      return { ...prev, suitableFor: next };
     });
   };
 
@@ -422,7 +448,13 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
               id="pf-rent"
               type="number"
               min={0}
-              required
+              // Phase 2 Part 2 (Shop Listing UI): rentAmount is not one of
+              // the shop's four required fields ("Shop Carpet Area, Floor,
+              // Address, PIN Code -- everything else optional"), so
+              // `required` is dropped for shop. A blank field still
+              // submits 0, which the backend's `rentAmount: z.number()
+              // .min(0)` accepts.
+              required={!isShop}
               value={values.rentAmount}
               onChange={(e) => update("rentAmount", Number(e.target.value))}
             />
@@ -438,7 +470,10 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
             />
           </div>
           <div className="field">
-            <label htmlFor="pf-area">Area (sqft)</label>
+            {/* "Shop Carpet Area" for shop listings reuses this same
+                areaSqft field/input -- only the label changes. Already
+                required for every property type. */}
+            <label htmlFor="pf-area">{isShop ? "Shop Carpet Area (sqft)" : "Area (sqft)"} <RequiredMark /></label>
             <input
               id="pf-area"
               type="number"
@@ -458,26 +493,34 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
               onChange={(e) => update("availableFrom", e.target.value)}
             />
           </div>
-          <div className="field">
-            <label htmlFor="pf-bedrooms">Bedrooms</label>
-            <input
-              id="pf-bedrooms"
-              type="number"
-              min={0}
-              value={values.bedrooms}
-              onChange={(e) => update("bedrooms", Number(e.target.value))}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="pf-bathrooms">Bathrooms</label>
-            <input
-              id="pf-bathrooms"
-              type="number"
-              min={0}
-              value={values.bathrooms}
-              onChange={(e) => update("bathrooms", Number(e.target.value))}
-            />
-          </div>
+          {/* Phase 2 Part 2 (Shop Listing UI): Bedrooms/Bathrooms/Furnished
+              status/Total floors hidden entirely for shop listings, per
+              spec. Parking spaces and Facing stay visible for every
+              property type. */}
+          {!isShop && (
+            <div className="field">
+              <label htmlFor="pf-bedrooms">Bedrooms</label>
+              <input
+                id="pf-bedrooms"
+                type="number"
+                min={0}
+                value={values.bedrooms}
+                onChange={(e) => update("bedrooms", Number(e.target.value))}
+              />
+            </div>
+          )}
+          {!isShop && (
+            <div className="field">
+              <label htmlFor="pf-bathrooms">Bathrooms</label>
+              <input
+                id="pf-bathrooms"
+                type="number"
+                min={0}
+                value={values.bathrooms}
+                onChange={(e) => update("bathrooms", Number(e.target.value))}
+              />
+            </div>
+          )}
           <div className="field">
             <label htmlFor="pf-parking">Parking spaces</label>
             <input
@@ -488,38 +531,48 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
               onChange={(e) => update("parkingSpaces", Number(e.target.value))}
             />
           </div>
+          {!isShop && (
+            <div className="field">
+              <label htmlFor="pf-furnished">Furnished status</label>
+              <select
+                id="pf-furnished"
+                value={values.furnishedStatus}
+                onChange={(e) => update("furnishedStatus", e.target.value as FurnishedStatus)}
+              >
+                {FURNISHED.map((f) => (
+                  <option key={f} value={f}>
+                    {f.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="field">
-            <label htmlFor="pf-furnished">Furnished status</label>
-            <select
-              id="pf-furnished"
-              value={values.furnishedStatus}
-              onChange={(e) => update("furnishedStatus", e.target.value as FurnishedStatus)}
-            >
-              {FURNISHED.map((f) => (
-                <option key={f} value={f}>
-                  {f.replace("_", " ")}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="pf-floor">Floor number</label>
+            {/* "Floor" for shop listings reuses this same floorNumber
+                field/input, and becomes required (spec: Shop requires
+                Shop Carpet Area, Floor, Address, PIN Code). */}
+            <label htmlFor="pf-floor">
+              {isShop ? <>Floor <RequiredMark /></> : "Floor number"}
+            </label>
             <input
               id="pf-floor"
               type="number"
+              required={isShop}
               value={values.floorNumber ?? ""}
               onChange={(e) => update("floorNumber", e.target.value === "" ? undefined : Number(e.target.value))}
             />
           </div>
-          <div className="field">
-            <label htmlFor="pf-total-floors">Total floors</label>
-            <input
-              id="pf-total-floors"
-              type="number"
-              value={values.totalFloors ?? ""}
-              onChange={(e) => update("totalFloors", e.target.value === "" ? undefined : Number(e.target.value))}
-            />
-          </div>
+          {!isShop && (
+            <div className="field">
+              <label htmlFor="pf-total-floors">Total floors</label>
+              <input
+                id="pf-total-floors"
+                type="number"
+                value={values.totalFloors ?? ""}
+                onChange={(e) => update("totalFloors", e.target.value === "" ? undefined : Number(e.target.value))}
+              />
+            </div>
+          )}
           <div className="field">
             <label htmlFor="pf-facing">Facing</label>
             <select
@@ -535,7 +588,108 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
               ))}
             </select>
           </div>
+
+          {/* Phase 2 Part 2 (Shop Listing UI): shop-only fields, shown only
+              when propertyType === "shop". All optional. */}
+          {isShop && (
+            <>
+              <div className="field">
+                <label htmlFor="pf-front-width">Front width (ft)</label>
+                <input
+                  id="pf-front-width"
+                  type="number"
+                  min={0}
+                  value={values.frontWidthFt ?? ""}
+                  onChange={(e) => update("frontWidthFt", e.target.value === "" ? undefined : Number(e.target.value))}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="pf-shop-depth">Shop depth (ft)</label>
+                <input
+                  id="pf-shop-depth"
+                  type="number"
+                  min={0}
+                  value={values.shopDepthFt ?? ""}
+                  onChange={(e) => update("shopDepthFt", e.target.value === "" ? undefined : Number(e.target.value))}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="pf-road-width">Road width (ft)</label>
+                <input
+                  id="pf-road-width"
+                  type="number"
+                  min={0}
+                  value={values.roadWidthFt ?? ""}
+                  onChange={(e) => update("roadWidthFt", e.target.value === "" ? undefined : Number(e.target.value))}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="pf-power-load">Power load</label>
+                <input
+                  id="pf-power-load"
+                  type="text"
+                  maxLength={60}
+                  placeholder="Example: 5 kW / 3-phase"
+                  value={values.powerLoad ?? ""}
+                  onChange={(e) => update("powerLoad", e.target.value === "" ? undefined : e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="pf-corner-shop">Corner shop</label>
+                <select
+                  id="pf-corner-shop"
+                  value={values.isCornerShop === undefined ? "" : values.isCornerShop ? "yes" : "no"}
+                  onChange={(e) => update("isCornerShop", e.target.value === "" ? undefined : e.target.value === "yes")}
+                >
+                  <option value="">Not specified</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="pf-washroom">Washroom</label>
+                <select
+                  id="pf-washroom"
+                  value={values.hasWashroom === undefined ? "" : values.hasWashroom ? "yes" : "no"}
+                  onChange={(e) => update("hasWashroom", e.target.value === "" ? undefined : e.target.value === "yes")}
+                >
+                  <option value="">Not specified</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="pf-ready-to-move">Ready to move</label>
+                <select
+                  id="pf-ready-to-move"
+                  value={values.readyToMove === undefined ? "" : values.readyToMove ? "yes" : "no"}
+                  onChange={(e) => update("readyToMove", e.target.value === "" ? undefined : e.target.value === "yes")}
+                >
+                  <option value="">Not specified</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+            </>
+          )}
         </div>
+        {isShop && (
+          <div className="field" style={{ marginTop: "var(--space-4, 1rem)" }}>
+            <label>Suitable for</label>
+            <div className="checkbox-grid">
+              {SUITABLE_FOR_KEYS.map((tag) => (
+                <label key={tag} className="checkbox-tile">
+                  <input
+                    type="checkbox"
+                    checked={(values.suitableFor ?? []).includes(tag)}
+                    onChange={() => toggleSuitableFor(tag)}
+                  />
+                  {tag.replace(/_/g, " ")}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="form-section">

@@ -36,6 +36,15 @@ interface PropertyRow {
   moderated_by: string | null;
   moderated_at: Date | null;
   rejection_reason: string | null;
+  // Phase 2 Part 2 (Shop Listing UI).
+  front_width_ft: string | null;
+  shop_depth_ft: string | null;
+  road_width_ft: string | null;
+  power_load: string | null;
+  is_corner_shop: boolean | null;
+  has_washroom: boolean | null;
+  ready_to_move: boolean | null;
+  suitable_for: string[] | null;
   created_at: Date;
   updated_at: Date;
   deleted_at: Date | null;
@@ -69,6 +78,14 @@ function toEntity(row: PropertyRow): Property {
     moderatedBy: row.moderated_by,
     moderatedAt: row.moderated_at,
     rejectionReason: row.rejection_reason,
+    frontWidthFt: row.front_width_ft !== null ? parseFloat(row.front_width_ft) : null,
+    shopDepthFt: row.shop_depth_ft !== null ? parseFloat(row.shop_depth_ft) : null,
+    roadWidthFt: row.road_width_ft !== null ? parseFloat(row.road_width_ft) : null,
+    powerLoad: row.power_load,
+    isCornerShop: row.is_corner_shop,
+    hasWashroom: row.has_washroom,
+    readyToMove: row.ready_to_move,
+    suitableFor: row.suitable_for,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -83,8 +100,10 @@ export class PropertyRepository implements IPropertyRepository {
       `INSERT INTO properties (
          owner_id, category_id, title, description, property_type, rent_amount,
          security_deposit, area_sqft, bedrooms, bathrooms, parking_spaces,
-         floor_number, total_floors, facing, furnished_status, available_from
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+         floor_number, total_floors, facing, furnished_status, available_from,
+         front_width_ft, shop_depth_ft, road_width_ft, power_load,
+         is_corner_shop, has_washroom, ready_to_move, suitable_for
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
        RETURNING *`,
       [
         data.ownerId,
@@ -103,6 +122,14 @@ export class PropertyRepository implements IPropertyRepository {
         data.facing ?? null,
         data.furnishedStatus,
         data.availableFrom,
+        data.frontWidthFt ?? null,
+        data.shopDepthFt ?? null,
+        data.roadWidthFt ?? null,
+        data.powerLoad ?? null,
+        data.isCornerShop ?? null,
+        data.hasWashroom ?? null,
+        data.readyToMove ?? null,
+        data.suitableFor ?? null,
       ],
     );
     return toEntity(result.rows[0]);
@@ -138,6 +165,14 @@ export class PropertyRepository implements IPropertyRepository {
       moderated_by: patch.moderatedBy,
       moderated_at: patch.moderatedAt,
       rejection_reason: patch.rejectionReason,
+      front_width_ft: patch.frontWidthFt,
+      shop_depth_ft: patch.shopDepthFt,
+      road_width_ft: patch.roadWidthFt,
+      power_load: patch.powerLoad,
+      is_corner_shop: patch.isCornerShop,
+      has_washroom: patch.hasWashroom,
+      ready_to_move: patch.readyToMove,
+      suitable_for: patch.suitableFor,
     };
 
     const fields: string[] = [];
