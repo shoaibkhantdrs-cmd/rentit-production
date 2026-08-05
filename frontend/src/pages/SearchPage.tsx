@@ -44,6 +44,7 @@ const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
   { value: "pg", label: "PG" },
   { value: "room", label: "Room" },
   { value: "commercial", label: "Commercial" },
+  { value: "shop", label: "Shop" },
   { value: "other", label: "Other" },
 ];
 const FURNISHED_OPTIONS: { value: FurnishedStatus; label: string }[] = [

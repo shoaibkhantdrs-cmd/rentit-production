@@ -7,9 +7,22 @@ import { EmptyState } from "@/components/EmptyState";
 import { Pagination } from "@/components/Pagination";
 import { StatusPill } from "@/components/admin/AdminWidgets";
 import { ApiError } from "@/api/httpClient";
-import { AdminPropertySort, BulkModerationAction, PropertyStatus } from "@/api/types";
+import { AdminPropertySort, BulkModerationAction, PropertyStatus, PropertyType } from "@/api/types";
 
 const PAGE_SIZE = 20;
+
+const PROPERTY_TYPE_OPTIONS: { value: PropertyType | ""; label: string }[] = [
+  { value: "", label: "All types" },
+  { value: "apartment", label: "Apartment" },
+  { value: "house", label: "House" },
+  { value: "villa", label: "Villa" },
+  { value: "studio", label: "Studio" },
+  { value: "pg", label: "PG" },
+  { value: "room", label: "Room" },
+  { value: "commercial", label: "Commercial" },
+  { value: "shop", label: "Shop" },
+  { value: "other", label: "Other" },
+];
 
 const TABS: Array<{ key: string; label: string; status?: PropertyStatus; isFeatured?: boolean }> = [
   { key: "all", label: "All" },
@@ -27,6 +40,7 @@ export function PropertiesPage() {
 
   const [tab, setTab] = useState(initialTab);
   const [sort, setSort] = useState<AdminPropertySort>("newest");
+  const [propertyType, setPropertyType] = useState<PropertyType | "">("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
@@ -38,12 +52,13 @@ export function PropertiesPage() {
     () =>
       adminApi.searchProperties({
         status: activeTab.status,
+        propertyType: propertyType || undefined,
         isFeatured: activeTab.isFeatured,
         sort,
         page,
         pageSize: PAGE_SIZE,
       }),
-    [tab, sort, page],
+    [tab, sort, propertyType, page],
   );
 
   const changeTab = (key: string) => {
@@ -133,6 +148,17 @@ export function PropertiesPage() {
           <option value="most_viewed">Most viewed</option>
           <option value="most_favorited">Most favorited</option>
         </select>
+        <select
+          value={propertyType}
+          onChange={(e) => {
+            setPropertyType(e.target.value as PropertyType | "");
+            setPage(1);
+          }}
+        >
+          {PROPERTY_TYPE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
 
         {selected.size > 0 && (
           <div className="admin-bulk-bar">
@@ -175,6 +201,7 @@ export function PropertiesPage() {
               <tr>
                 <th />
                 <th>Title</th>
+                <th>Type</th>
                 <th>Status</th>
                 <th>Rent</th>
                 <th>Views</th>
@@ -194,6 +221,7 @@ export function PropertiesPage() {
                     />
                   </td>
                   <td>{property.title}</td>
+                  <td>{property.propertyType}</td>
                   <td>
                     <StatusPill status={property.status} />
                   </td>

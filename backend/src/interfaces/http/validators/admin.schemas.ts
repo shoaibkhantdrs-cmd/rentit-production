@@ -48,8 +48,21 @@ const propertyStatusEnum = z.enum([
   "rejected",
 ]);
 
+const adminPropertyTypeEnum = z.enum([
+  "apartment",
+  "house",
+  "villa",
+  "studio",
+  "pg",
+  "room",
+  "commercial",
+  "shop",
+  "other",
+]);
+
 export const adminSearchPropertiesQuerySchema = z.object({
   status: propertyStatusEnum.optional(),
+  propertyType: adminPropertyTypeEnum.optional(),
   categoryId: z.string().uuid().optional(),
   ownerId: z.string().uuid().optional(),
   isFeatured: booleanQueryParam,

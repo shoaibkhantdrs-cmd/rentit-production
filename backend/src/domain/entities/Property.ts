@@ -6,6 +6,7 @@ export type PropertyType =
   | "pg"
   | "room"
   | "commercial"
+  | "shop"
   | "other";
 
 export type PropertyStatus =

@@ -34,6 +34,7 @@ export function buildAdminPropertySearchQuery(options: AdminPropertySearchOption
   };
 
   if (filters.status) push("p.status = ?", filters.status);
+  if (filters.propertyType) push("p.property_type = ?", filters.propertyType);
   if (filters.categoryId) push("p.category_id = ?", filters.categoryId);
   if (filters.ownerId) push("p.owner_id = ?", filters.ownerId);
   if (filters.isFeatured !== undefined) push("p.is_featured = ?", filters.isFeatured);

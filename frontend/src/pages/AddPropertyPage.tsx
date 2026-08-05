@@ -31,7 +31,7 @@ import { ApiError } from "@/api/httpClient";
 import { Chip } from "@/components/ui/Chip";
 import { formatCurrency } from "@/utils/format";
 
-const PROPERTY_TYPES: PropertyType[] = ["apartment", "house", "villa", "studio", "pg", "room", "commercial", "other"];
+const PROPERTY_TYPES: PropertyType[] = ["apartment", "house", "villa", "studio", "pg", "room", "commercial", "shop", "other"];
 const FACINGS: Facing[] = ["north", "south", "east", "west", "north_east", "north_west", "south_east", "south_west"];
 const FURNISHED: FurnishedStatus[] = ["unfurnished", "semi_furnished", "fully_furnished"];
 

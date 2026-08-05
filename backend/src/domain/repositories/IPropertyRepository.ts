@@ -56,6 +56,7 @@ export interface PropertySearchResult {
  */
 export interface AdminPropertySearchFilters {
   status?: Property["status"];
+  propertyType?: Property["propertyType"];
   categoryId?: string;
   ownerId?: string;
   isFeatured?: boolean;

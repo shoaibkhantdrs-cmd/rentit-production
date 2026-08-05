@@ -9,6 +9,7 @@ const propertyTypeEnum = z.enum([
   "pg",
   "room",
   "commercial",
+  "shop",
   "other",
 ]);
 

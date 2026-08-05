@@ -3,6 +3,7 @@ import { Property } from "@/domain/entities/Property";
 
 export interface AdminSearchPropertiesInput {
   status?: Property["status"];
+  propertyType?: Property["propertyType"];
   categoryId?: string;
   ownerId?: string;
   isFeatured?: boolean;
@@ -25,6 +26,7 @@ export class AdminSearchPropertiesUseCase {
     return this.propertyRepo.adminSearch({
       filters: {
         status: input.status,
+        propertyType: input.propertyType,
         categoryId: input.categoryId,
         ownerId: input.ownerId,
         isFeatured: input.isFeatured,

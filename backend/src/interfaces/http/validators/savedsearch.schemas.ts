@@ -12,6 +12,7 @@ const propertyTypeEnum = z.enum([
   "pg",
   "room",
   "commercial",
+  "shop",
   "other",
 ]);
 const furnishedStatusEnum = z.enum(["unfurnished", "semi_furnished", "fully_furnished"]);

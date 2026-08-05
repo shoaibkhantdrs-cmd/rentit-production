@@ -30,6 +30,7 @@ const PROPERTY_TYPES: PropertyType[] = [
   "pg",
   "room",
   "commercial",
+  "shop",
   "other",
 ];
 const FACINGS: Facing[] = [

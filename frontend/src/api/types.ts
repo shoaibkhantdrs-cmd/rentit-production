@@ -11,6 +11,7 @@ export type PropertyType =
   | "pg"
   | "room"
   | "commercial"
+  | "shop"
   | "other";
 
 export type PropertyStatus =
@@ -324,6 +325,7 @@ export type AdminPropertySort = "newest" | "oldest" | "most_viewed" | "most_favo
 
 export interface AdminPropertySearchFilters {
   status?: AdminProperty["status"];
+  propertyType?: PropertyType;
   categoryId?: string;
   ownerId?: string;
   isFeatured?: boolean;
