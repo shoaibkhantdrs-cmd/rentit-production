@@ -27,15 +27,28 @@ services:
     rootDir: backend
     buildCommand: npm ci && npm run build
     startCommand: npm start
-    # Runs pending node-pg-migrate migrations against DATABASE_URL before
-    # each deploy's start command. Added 2026-08-06 after a live incident:
-    # commit f020429 added migration 1700000000049 (shop listing fields)
-    # but nothing in the deploy pipeline applied it, so the columns never
-    # existed in production and every Shop listing submission failed with
-    # a masked 500 ("column \"front_width_ft\" of relation \"properties\"
-    # does not exist"). node-pg-migrate only applies migrations not yet
-    # recorded in the pgmigrations table, so this is a no-op on deploys
-    # with no new migration files.
+    # Pre-Deploy Command is a paid-plan-only Render feature -- on `plan:
+    # free` (this service) Render silently ignores it, which is why the
+    # dashboard kept showing an empty Pre-Deploy Command even after this
+    # line was added and deployed. Left in place as forward-compatible,
+    # idempotent documentation for if this service is ever upgraded off
+    # Free; it is NOT what actually runs migrations today.
+    #
+    # The real, Free-plan-compatible mechanism: backend/package.json's
+    # "start" script is now `npm run migrate:up && node dist/server.js`,
+    # so pending migrations run on every boot, before the server accepts
+    # traffic. node-pg-migrate tracks applied migrations in a
+    # `pgmigrations` table and only runs ones not yet recorded there, so
+    # this is a fast no-op on any boot/restart that isn't a fresh deploy
+    # with new migration files -- safe to run every time, no manual step
+    # ever required again.
+    #
+    # Added 2026-08-06 after a live incident: commit f020429 shipped
+    # migration 1700000000049 (shop listing fields) but nothing in the
+    # deploy pipeline applied it, so the columns never existed in
+    # production and every Shop listing submission failed with a masked
+    # 500 ("column \"front_width_ft\" of relation \"properties\" does
+    # not exist").
     preDeployCommand: npm run migrate:up
     healthCheckPath: /health/live
     envVars:
