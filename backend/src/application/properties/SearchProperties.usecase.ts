@@ -21,6 +21,14 @@ export interface SearchPropertiesInput {
   latitude?: number;
   longitude?: number;
   radiusKm?: number;
+  // Phase 3 Part 1 (Shop Search & Filters). Mirrors PropertySearchFilters --
+  // passed straight through to the repository, no other handling needed.
+  frontWidthMin?: number;
+  roadWidthMin?: number;
+  readyToMove?: boolean;
+  isCornerShop?: boolean;
+  hasWashroom?: boolean;
+  suitableFor?: string[];
   sort: SortOption;
   page: number;
   pageSize: number;
@@ -75,6 +83,12 @@ export class SearchPropertiesUseCase {
         latitude: input.latitude,
         longitude: input.longitude,
         radiusKm: input.radiusKm,
+        frontWidthMin: input.frontWidthMin,
+        roadWidthMin: input.roadWidthMin,
+        readyToMove: input.readyToMove,
+        isCornerShop: input.isCornerShop,
+        hasWashroom: input.hasWashroom,
+        suitableFor: input.suitableFor,
       },
       sort: input.sort,
       page: input.page,

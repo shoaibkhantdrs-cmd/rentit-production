@@ -32,6 +32,34 @@ const featureKeyEnum = z.enum(PROPERTY_FEATURE_KEYS);
 const suitableForEnum = z.enum(SUITABLE_FOR_KEYS);
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be an ISO date (YYYY-MM-DD)");
 
+// Phase 3 Part 1 (Shop Search & Filters). z.coerce.boolean() treats any
+// non-empty string (including "false") as true -- this maps the literal
+// query-string values instead. Same helper as admin.schemas.ts's
+// booleanQueryParam, kept local here rather than shared/imported since
+// each validator file already keeps its own small helpers.
+const booleanQueryParam = z.preprocess((val) => {
+  if (val === "true") return true;
+  if (val === "false") return false;
+  return val;
+}, z.boolean().optional());
+
+// Phase 3 Part 1 (Shop Search & Filters). Query-string arrays arrive as
+// either a repeated key (already an array by the time Express/qs parses
+// it) or a single comma-joined string, depending on client -- this accepts
+// both and normalizes to a string array before the z.enum array check.
+const commaSeparatedArray = (schema: z.ZodTypeAny) =>
+  z.preprocess((val) => {
+    if (val === undefined || val === null || val === "") return undefined;
+    if (Array.isArray(val)) return val;
+    if (typeof val === "string") {
+      return val
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    return val;
+  }, z.array(schema).optional());
+
 const locationSchema = z.object({
   addressLine: z.string().min(5).max(300),
   city: z.string().min(2).max(120),
@@ -158,6 +186,17 @@ export const searchPropertiesQuerySchema = z.object({
   lat: z.coerce.number().min(-90).max(90).optional(),
   lng: z.coerce.number().min(-180).max(180).optional(),
   radiusKm: z.coerce.number().positive().max(500).optional(),
+  // Phase 3 Part 1 (Shop Search & Filters). All optional and additive --
+  // absent for every existing client/bookmarked URL, so residential search
+  // behavior is unchanged when these aren't sent. See
+  // buildPropertySearchQuery.ts for how each maps to a nullable shop-only
+  // column (NULL for every non-shop row).
+  frontWidthMin: z.coerce.number().min(0).optional(),
+  roadWidthMin: z.coerce.number().min(0).optional(),
+  readyToMove: booleanQueryParam,
+  isCornerShop: booleanQueryParam,
+  hasWashroom: booleanQueryParam,
+  suitableFor: commaSeparatedArray(suitableForEnum),
   sort: z.enum(["newest", "most_viewed", "price_low_to_high", "price_high_to_low"]).default("newest"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),

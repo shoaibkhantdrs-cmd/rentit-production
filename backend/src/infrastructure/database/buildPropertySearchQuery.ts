@@ -49,6 +49,26 @@ export function buildPropertySearchQuery(options: PropertySearchOptions): BuiltQ
   if (filters.city) push("pl.city ILIKE ?", `%${filters.city}%`);
   if (filters.locality) push("pl.locality ILIKE ?", `%${filters.locality}%`);
 
+  // Phase 3 Part 1 (Shop Search & Filters). Each column below is NULL for
+  // every non-shop row, so these conditions correctly exclude residential
+  // listings by construction -- no explicit `propertyType = 'shop'` guard
+  // needed (NULL >= x and NULL = true both evaluate to no-match). Absent
+  // from a query string (the case for every search today), zero conditions
+  // are added and the query is byte-for-byte identical to before this
+  // change.
+  if (filters.frontWidthMin !== undefined) push("p.front_width_ft >= ?", filters.frontWidthMin);
+  if (filters.roadWidthMin !== undefined) push("p.road_width_ft >= ?", filters.roadWidthMin);
+  if (filters.readyToMove !== undefined) push("p.ready_to_move = ?", filters.readyToMove);
+  if (filters.isCornerShop !== undefined) push("p.is_corner_shop = ?", filters.isCornerShop);
+  if (filters.hasWashroom !== undefined) push("p.has_washroom = ?", filters.hasWashroom);
+  // suitable_for is a native TEXT[] column -- `&&` is Postgres's
+  // array-overlap operator ("matches any of"), the one condition here that
+  // isn't a plain scalar comparison. NULL && anything is NULL (falsy), so
+  // this also correctly excludes residential rows.
+  if (filters.suitableFor !== undefined && filters.suitableFor.length > 0) {
+    push("p.suitable_for && ?::text[]", filters.suitableFor);
+  }
+
   let distanceSelect = "NULL::numeric AS distance_km";
   let havingRadius = "";
 

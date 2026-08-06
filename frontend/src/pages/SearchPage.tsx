@@ -32,7 +32,15 @@ import { Tabs } from "@/components/ui/Tabs";
 import { Drawer } from "@/components/ui/Drawer";
 import { useToast } from "@/components/ui/Toast";
 import { ApiError } from "@/api/httpClient";
-import { FurnishedStatus, PropertyCategory, PropertySummary, PropertyType, SavedSearchFilters, SortOption } from "@/api/types";
+import {
+  FurnishedStatus,
+  PropertyCategory,
+  PropertySummary,
+  PropertyType,
+  SavedSearchFilters,
+  SortOption,
+  SUITABLE_FOR_KEYS,
+} from "@/api/types";
 import { formatCurrency } from "@/utils/format";
 import { clearRecentSearches, loadRecentSearches, RecentSearch, saveRecentSearch } from "@/utils/recentSearches";
 
@@ -81,6 +89,14 @@ function num(params: URLSearchParams, key: string): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
+// Phase 3 Part 1 (Shop Search & Filters). Mirrors num() above for the new
+// boolean shop filters -- only ever written as the literal string "true"
+// (see the Chip onClick handlers below), so a straight equality check is
+// enough; there's no "false" value stored in the URL, just absence.
+function bool(params: URLSearchParams, key: string): boolean | undefined {
+  return params.get(key) === "true" ? true : undefined;
+}
+
 export function SearchPage() {
   const { isAuthenticated } = useAuth();
   const { showToast } = useToast();
@@ -119,6 +135,17 @@ export function SearchPage() {
     lat: num(searchParams, "lat"),
     lng: num(searchParams, "lng"),
     radiusKm: num(searchParams, "radiusKm"),
+    // Phase 3 Part 1 (Shop Search & Filters). Only ever set when
+    // propertyType === "shop" (see filterBody below), so these stay
+    // undefined for every other search -- unchanged request shape.
+    frontWidthMin: num(searchParams, "frontWidthMin"),
+    roadWidthMin: num(searchParams, "roadWidthMin"),
+    readyToMove: bool(searchParams, "readyToMove"),
+    isCornerShop: bool(searchParams, "isCornerShop"),
+    hasWashroom: bool(searchParams, "hasWashroom"),
+    suitableFor: searchParams.get("suitableFor")
+      ? searchParams.get("suitableFor")!.split(",").filter(Boolean)
+      : undefined,
     sort: (searchParams.get("sort") as SortOption | null) ?? "newest",
     page: num(searchParams, "page") ?? 1,
     pageSize: 20,
@@ -261,6 +288,15 @@ export function SearchPage() {
     setGeoStatus(null);
   };
 
+  // Phase 3 Part 1 (Shop Search & Filters). Same toggle-membership pattern
+  // as PropertyForm.tsx's toggleSuitableFor (Add/Edit listing), applied to
+  // the URL-backed filter instead of local form state.
+  const toggleSuitableFor = (tag: string) => {
+    const current = filters.suitableFor ?? [];
+    const next = current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag];
+    setParam("suitableFor", next.length > 0 ? next.join(",") : undefined);
+  };
+
   const useNearby = () => {
     if (!navigator.geolocation) {
       setGeoStatus("Your browser doesn't support geolocation.");
@@ -368,6 +404,19 @@ export function SearchPage() {
   if (filters.locality) activeChips.push({ key: "locality", label: filters.locality, onRemove: () => setParam("locality", undefined) });
   if (filters.availableFrom) activeChips.push({ key: "availableFrom", label: `From ${filters.availableFrom}`, onRemove: () => setParam("availableFrom", undefined) });
   if (filters.lat !== undefined) activeChips.push({ key: "nearby", label: `Within ${filters.radiusKm ?? 10} km`, onRemove: clearNearby });
+  // Phase 3 Part 1 (Shop Search & Filters).
+  if (filters.frontWidthMin) activeChips.push({ key: "frontWidthMin", label: `${filters.frontWidthMin}+ ft front width`, onRemove: () => setParam("frontWidthMin", undefined) });
+  if (filters.roadWidthMin) activeChips.push({ key: "roadWidthMin", label: `${filters.roadWidthMin}+ ft road width`, onRemove: () => setParam("roadWidthMin", undefined) });
+  if (filters.readyToMove) activeChips.push({ key: "readyToMove", label: "Ready to move", onRemove: () => setParam("readyToMove", undefined) });
+  if (filters.isCornerShop) activeChips.push({ key: "isCornerShop", label: "Corner shop", onRemove: () => setParam("isCornerShop", undefined) });
+  if (filters.hasWashroom) activeChips.push({ key: "hasWashroom", label: "Washroom", onRemove: () => setParam("hasWashroom", undefined) });
+  if (filters.suitableFor && filters.suitableFor.length > 0) {
+    activeChips.push({
+      key: "suitableFor",
+      label: `Suitable for: ${filters.suitableFor.map((t) => t.replace(/_/g, " ")).join(", ")}`,
+      onRemove: () => setParam("suitableFor", undefined),
+    });
+  }
 
   // Record this as a recent search once results actually load -- only when
   // it carries a real filter (not just default page/sort), so the list
@@ -546,6 +595,65 @@ export function SearchPage() {
           onChange={(e) => setParam("availableFrom", e.target.value || undefined)}
         />
       </AccordionItem>
+
+      {/* Phase 3 Part 1 (Shop Search & Filters). Only rendered/settable when
+          "Shop" is the selected property type -- matches how the Add/Edit
+          listing forms already gate these same fields, and means these
+          params are never present in a residential search's request. */}
+      {filters.propertyType === "shop" ? (
+        <AccordionItem id="shopFilters" title="Shop details" icon={<Building2 size={16} />}>
+          <div className="chip-row">
+            <Chip
+              active={filters.readyToMove === true}
+              onClick={() => setParam("readyToMove", filters.readyToMove === true ? undefined : "true")}
+            >
+              Ready to move
+            </Chip>
+            <Chip
+              active={filters.isCornerShop === true}
+              onClick={() => setParam("isCornerShop", filters.isCornerShop === true ? undefined : "true")}
+            >
+              Corner shop
+            </Chip>
+            <Chip
+              active={filters.hasWashroom === true}
+              onClick={() => setParam("hasWashroom", filters.hasWashroom === true ? undefined : "true")}
+            >
+              Washroom
+            </Chip>
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label htmlFor="f-frontWidthMin">Min front width (ft)</label>
+            <input
+              id="f-frontWidthMin"
+              type="number"
+              min={0}
+              value={filters.frontWidthMin ?? ""}
+              onChange={(e) => setParam("frontWidthMin", e.target.value || undefined)}
+            />
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label htmlFor="f-roadWidthMin">Min road width (ft)</label>
+            <input
+              id="f-roadWidthMin"
+              type="number"
+              min={0}
+              value={filters.roadWidthMin ?? ""}
+              onChange={(e) => setParam("roadWidthMin", e.target.value || undefined)}
+            />
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Suitable for</label>
+            <div className="chip-row">
+              {SUITABLE_FOR_KEYS.map((tag) => (
+                <Chip key={tag} active={(filters.suitableFor ?? []).includes(tag)} onClick={() => toggleSuitableFor(tag)}>
+                  {tag.replace(/_/g, " ")}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        </AccordionItem>
+      ) : null}
     </Accordion>
   );
 

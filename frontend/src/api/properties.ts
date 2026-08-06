@@ -44,6 +44,15 @@ export const propertiesApi = {
         lat: filters.lat,
         lng: filters.lng,
         radiusKm: filters.radiusKm,
+        frontWidthMin: filters.frontWidthMin,
+        roadWidthMin: filters.roadWidthMin,
+        readyToMove: filters.readyToMove,
+        isCornerShop: filters.isCornerShop,
+        hasWashroom: filters.hasWashroom,
+        // httpClient's query type is flat scalars only -- comma-join here,
+        // matching the backend's comma-split preprocessor for this exact
+        // param (see searchPropertiesQuerySchema's commaSeparatedArray).
+        suitableFor: filters.suitableFor && filters.suitableFor.length > 0 ? filters.suitableFor.join(",") : undefined,
         sort: filters.sort,
         page: filters.page,
         pageSize: filters.pageSize,

@@ -123,3 +123,58 @@ test("buildPropertySearchQuery: radius search omitted when only some of lat/lng/
   assert.doesNotMatch(itemsQuery, /BETWEEN/);
   assert.deepEqual(itemsValues, [20, 0]);
 });
+
+// Phase 3 Part 1 (Shop Search & Filters).
+
+test("buildPropertySearchQuery: shop filters absent -- query identical to a plain residential search", () => {
+  const withoutShopFilters = buildPropertySearchQuery(baseOptions({ filters: { city: "Pune" } }));
+  const withEmptySuitableFor = buildPropertySearchQuery(
+    baseOptions({ filters: { city: "Pune", suitableFor: [] } }),
+  );
+  // An empty suitableFor array (nothing selected in the UI) must not add a
+  // condition either -- only a non-empty array should.
+  assert.deepEqual(withoutShopFilters, withEmptySuitableFor);
+  assert.doesNotMatch(withoutShopFilters.itemsQuery, /front_width_ft|road_width_ft|ready_to_move|is_corner_shop|has_washroom|suitable_for/);
+});
+
+test("buildPropertySearchQuery: each new boolean/numeric shop filter adds its own condition", () => {
+  const { itemsQuery, itemsValues } = buildPropertySearchQuery(
+    baseOptions({
+      filters: {
+        frontWidthMin: 25,
+        roadWidthMin: 20,
+        readyToMove: true,
+        isCornerShop: true,
+        hasWashroom: false,
+      },
+    }),
+  );
+  assert.match(itemsQuery, /p\.front_width_ft >= \$1/);
+  assert.match(itemsQuery, /p\.road_width_ft >= \$2/);
+  assert.match(itemsQuery, /p\.ready_to_move = \$3/);
+  assert.match(itemsQuery, /p\.is_corner_shop = \$4/);
+  assert.match(itemsQuery, /p\.has_washroom = \$5/);
+  assert.deepEqual(itemsValues, [25, 20, true, true, false, 20, 0]);
+});
+
+test("buildPropertySearchQuery: suitableFor uses the array-overlap operator with an explicit text[] cast", () => {
+  const { itemsQuery, itemsValues, countQuery, countValues } = buildPropertySearchQuery(
+    baseOptions({ filters: { suitableFor: ["electronics", "retail"] } }),
+  );
+  assert.match(itemsQuery, /p\.suitable_for && \$1::text\[\]/);
+  assert.deepEqual(itemsValues, [["electronics", "retail"], 20, 0]);
+  assert.match(countQuery, /p\.suitable_for && \$1::text\[\]/);
+  assert.deepEqual(countValues, [["electronics", "retail"]]);
+});
+
+test("buildPropertySearchQuery: shop filters combine correctly with existing residential filters", () => {
+  const { itemsQuery, itemsValues } = buildPropertySearchQuery(
+    baseOptions({
+      filters: { city: "Lucknow", bedroomsMin: 2, readyToMove: true },
+    }),
+  );
+  assert.match(itemsQuery, /p\.bedrooms >= \$1/);
+  assert.match(itemsQuery, /pl\.city ILIKE \$2/);
+  assert.match(itemsQuery, /p\.ready_to_move = \$3/);
+  assert.deepEqual(itemsValues, [2, "%Lucknow%", true, 20, 0]);
+});

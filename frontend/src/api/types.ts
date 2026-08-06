@@ -211,6 +211,15 @@ export interface SearchFilters {
   lat?: number;
   lng?: number;
   radiusKm?: number;
+  // Phase 3 Part 1 (Shop Search & Filters). All optional and additive --
+  // only meaningful when propertyType === "shop"; every other search is
+  // unaffected when these are undefined.
+  frontWidthMin?: number;
+  roadWidthMin?: number;
+  readyToMove?: boolean;
+  isCornerShop?: boolean;
+  hasWashroom?: boolean;
+  suitableFor?: string[];
   sort: SortOption;
   page: number;
   pageSize: number;

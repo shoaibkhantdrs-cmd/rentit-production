@@ -24,6 +24,16 @@ export interface PropertySearchFilters {
   latitude?: number;
   longitude?: number;
   radiusKm?: number;
+  // Phase 3 Part 1 (Shop Search & Filters). Each maps to a nullable
+  // shop-only column that's NULL for every non-shop row, so these
+  // correctly exclude residential listings by construction -- see
+  // buildPropertySearchQuery.ts.
+  frontWidthMin?: number;
+  roadWidthMin?: number;
+  readyToMove?: boolean;
+  isCornerShop?: boolean;
+  hasWashroom?: boolean;
+  suitableFor?: string[];
 }
 
 export interface PropertySearchOptions {
