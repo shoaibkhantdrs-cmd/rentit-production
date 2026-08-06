@@ -27,6 +27,16 @@ services:
     rootDir: backend
     buildCommand: npm ci && npm run build
     startCommand: npm start
+    # Runs pending node-pg-migrate migrations against DATABASE_URL before
+    # each deploy's start command. Added 2026-08-06 after a live incident:
+    # commit f020429 added migration 1700000000049 (shop listing fields)
+    # but nothing in the deploy pipeline applied it, so the columns never
+    # existed in production and every Shop listing submission failed with
+    # a masked 500 ("column \"front_width_ft\" of relation \"properties\"
+    # does not exist"). node-pg-migrate only applies migrations not yet
+    # recorded in the pgmigrations table, so this is a no-op on deploys
+    # with no new migration files.
+    preDeployCommand: npm run migrate:up
     healthCheckPath: /health/live
     envVars:
       - key: DATABASE_URL
