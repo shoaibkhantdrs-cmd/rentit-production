@@ -313,6 +313,53 @@ textarea {
   font-size: 0.8rem;
 }
 
+/* Pricing & size step: currency-prefixed input group (Monthly rent,
+   Security deposit). Reuses the exact same border/radius/background
+   tokens as `.field input` above -- the border and background move from
+   the input itself onto this wrapper, and the input becomes a plain,
+   borderless, transparent child, so the field is visually identical to
+   before except for the fixed ₹ chip on the left. Not a new visual
+   language, no new colors. */
+.input-group {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.input-group:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.input-group__prefix {
+  display: flex;
+  align-items: center;
+  padding: 10px 10px 10px 12px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  border-right: 1px solid var(--color-border);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.input-group input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.input-group input:focus {
+  outline: none;
+}
+
 .field-hint {
   color: var(--color-text-muted);
   font-size: 0.8rem;
