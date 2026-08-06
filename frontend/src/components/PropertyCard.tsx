@@ -7,6 +7,7 @@ import { propertiesApi } from "@/api/properties";
 import { useAuth } from "@/context/AuthContext";
 import { useCompare } from "@/context/CompareContext";
 import { useToast } from "@/components/ui/Toast";
+import { Badge } from "@/components/ui/Badge";
 import { ApiError } from "@/api/httpClient";
 import { formatCurrency } from "@/utils/format";
 import { cloudinaryTransform, cloudinarySrcSet } from "@/utils/cloudinaryImage";
@@ -51,6 +52,16 @@ function PropertyCardImpl({ property, showStatus = true }: PropertyCardProps) {
   const { isComparing, toggleCompare, canAddMore } = useCompare();
   const { showToast } = useToast();
   const isDetail = "images" in property;
+  // Phase 3 (Shop public display): PropertySummary (Search/Home rails,
+  // fed by propertiesApi.search()) was never extended with the shop-only
+  // fields (frontWidthFt/roadWidthFt/readyToMove/etc) -- only
+  // PropertyDetail (Favorites/My Properties/Recently Viewed/
+  // Recommendations, all of which set isDetail=true above) has them. So
+  // shop cards degrade gracefully: Shop Carpet Area (just areaSqft,
+  // present on both shapes) always renders, but Front Width/Road
+  // Width/Ready-To-Move only render where isDetail is true and the real
+  // data exists -- never as a placeholder or blank label.
+  const isShop = property.propertyType === "shop";
   const imageUrl = isDetail
     ? property.images.find((img) => img.isPrimary)?.url ?? property.images[0]?.url ?? null
     : property.primaryImageUrl;
@@ -203,9 +214,10 @@ function PropertyCardImpl({ property, showStatus = true }: PropertyCardProps) {
           </div>
         ) : null}
 
-        {showStatus && property.status !== "published" ? (
+        {(showStatus && property.status !== "published") || (isShop && isDetail && property.readyToMove) ? (
           <div className="property-card-v2__badges">
-            <StatusBadge status={property.status} />
+            {showStatus && property.status !== "published" ? <StatusBadge status={property.status} /> : null}
+            {isShop && isDetail && property.readyToMove ? <Badge variant="success">Ready to move</Badge> : null}
           </div>
         ) : null}
 
@@ -247,15 +259,35 @@ function PropertyCardImpl({ property, showStatus = true }: PropertyCardProps) {
         </div>
 
         <div className="property-card-v2__specs">
-          <span>
-            <BedDouble size={14} /> {property.bedrooms}
-          </span>
-          <span>
-            <Bath size={14} /> {property.bathrooms}
-          </span>
-          <span>
-            <Ruler size={14} /> {property.areaSqft} sqft
-          </span>
+          {isShop ? (
+            <>
+              <span>
+                <Ruler size={14} /> {property.areaSqft} sqft
+              </span>
+              {isDetail && property.frontWidthFt !== null ? (
+                <span>
+                  <Ruler size={14} /> {property.frontWidthFt} ft front
+                </span>
+              ) : null}
+              {isDetail && property.roadWidthFt !== null ? (
+                <span>
+                  <Ruler size={14} /> {property.roadWidthFt} ft road
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <span>
+                <BedDouble size={14} /> {property.bedrooms}
+              </span>
+              <span>
+                <Bath size={14} /> {property.bathrooms}
+              </span>
+              <span>
+                <Ruler size={14} /> {property.areaSqft} sqft
+              </span>
+            </>
+          )}
         </div>
 
         <div className="property-card-v2__actions">

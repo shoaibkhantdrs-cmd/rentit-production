@@ -22,6 +22,26 @@ const ROWS: { label: string; render: (p: PropertyDetail) => string }[] = [
   { label: "Location", render: (p) => [p.location?.locality, p.location?.city].filter(Boolean).join(", ") || "--" },
 ];
 
+// Phase 3 (Shop public display): a separate row set used only when every
+// queued property is a shop (see `allShops` below) -- ROWS above is never
+// modified, so any comparison that includes even one non-shop listing
+// (all-residential or a mixed set) keeps rendering exactly as it always
+// has.
+const SHOP_ROWS: { label: string; render: (p: PropertyDetail) => string }[] = [
+  { label: "Rent / month", render: (p) => formatCurrency(p.rentAmount) },
+  { label: "Security deposit", render: (p) => formatCurrency(p.securityDeposit) },
+  { label: "Area", render: (p) => `${p.areaSqft} sqft` },
+  { label: "Front width", render: (p) => (p.frontWidthFt !== null ? `${p.frontWidthFt} ft` : "--") },
+  { label: "Shop depth", render: (p) => (p.shopDepthFt !== null ? `${p.shopDepthFt} ft` : "--") },
+  { label: "Road width", render: (p) => (p.roadWidthFt !== null ? `${p.roadWidthFt} ft` : "--") },
+  { label: "Corner shop", render: (p) => (p.isCornerShop === null ? "--" : p.isCornerShop ? "Yes" : "No") },
+  { label: "Washroom", render: (p) => (p.hasWashroom === null ? "--" : p.hasWashroom ? "Yes" : "No") },
+  { label: "Ready to move", render: (p) => (p.readyToMove === null ? "--" : p.readyToMove ? "Yes" : "No") },
+  { label: "Power load", render: (p) => p.powerLoad ?? "--" },
+  { label: "Category", render: (p) => p.category?.name ?? "--" },
+  { label: "Location", render: (p) => [p.location?.locality, p.location?.city].filter(Boolean).join(", ") || "--" },
+];
+
 /** New page for the redesign's "Compare" feature -- fetches each queued
  * property's real detail via the existing `propertiesApi.getById` (no new
  * backend endpoint) and lays them out side by side. */
@@ -113,7 +133,7 @@ export function ComparePage() {
               </tr>
             </thead>
             <tbody>
-              {ROWS.map((row) => (
+              {(properties.every((p) => p.propertyType === "shop") ? SHOP_ROWS : ROWS).map((row) => (
                 <tr key={row.label}>
                   <td style={{ fontWeight: 700 }}>{row.label}</td>
                   {properties.map((p) => (

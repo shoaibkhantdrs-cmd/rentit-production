@@ -119,6 +119,11 @@ export function PropertyDetailsPage() {
     );
   }
 
+  // Phase 3 (Shop public display): PropertyDetailsPage always fetches the
+  // full PropertyDetail (propertiesApi.getById), so every shop field is
+  // guaranteed present here -- no PropertySummary/PropertyDetail gap like
+  // PropertyCard has.
+  const isShop = property.propertyType === "shop";
   const isFavorited = favoriteOverride ?? property.isFavorited ?? false;
   const isOwner = isAuthenticated && user?.id === property.owner?.id;
   const isAdmin = isAuthenticated && (user?.roles.includes("admin") || user?.roles.includes("super_admin"));
@@ -337,16 +342,20 @@ export function PropertyDetailsPage() {
           </div>
 
           <div className="detail-stats">
-            <div className="detail-stat">
-              <BedDouble size={18} style={{ color: "var(--color-primary)" }} />
-              <div className="detail-stat__value">{property.bedrooms}</div>
-              <div className="detail-stat__label">Bedrooms</div>
-            </div>
-            <div className="detail-stat">
-              <Bath size={18} style={{ color: "var(--color-primary)" }} />
-              <div className="detail-stat__value">{property.bathrooms}</div>
-              <div className="detail-stat__label">Bathrooms</div>
-            </div>
+            {!isShop && (
+              <div className="detail-stat">
+                <BedDouble size={18} style={{ color: "var(--color-primary)" }} />
+                <div className="detail-stat__value">{property.bedrooms}</div>
+                <div className="detail-stat__label">Bedrooms</div>
+              </div>
+            )}
+            {!isShop && (
+              <div className="detail-stat">
+                <Bath size={18} style={{ color: "var(--color-primary)" }} />
+                <div className="detail-stat__value">{property.bathrooms}</div>
+                <div className="detail-stat__label">Bathrooms</div>
+              </div>
+            )}
             <div className="detail-stat">
               <Car size={18} style={{ color: "var(--color-primary)" }} />
               <div className="detail-stat__value">{property.parkingSpaces}</div>
@@ -355,18 +364,36 @@ export function PropertyDetailsPage() {
             <div className="detail-stat">
               <Ruler size={18} style={{ color: "var(--color-primary)" }} />
               <div className="detail-stat__value">{property.areaSqft}</div>
-              <div className="detail-stat__label">Sqft</div>
+              <div className="detail-stat__label">{isShop ? "Shop Carpet Area" : "Sqft"}</div>
             </div>
             <div className="detail-stat">
               <Building2 size={18} style={{ color: "var(--color-primary)" }} />
               <div className="detail-stat__value">{property.floorNumber ?? "-"}</div>
               <div className="detail-stat__label">Floor</div>
             </div>
-            <div className="detail-stat">
-              <Compass size={18} style={{ color: "var(--color-primary)" }} />
-              <div className="detail-stat__value">{property.facing ?? "-"}</div>
-              <div className="detail-stat__label">Facing</div>
-            </div>
+            {isShop && (
+              <div className="detail-stat">
+                <Ruler size={18} style={{ color: "var(--color-primary)" }} />
+                <div className="detail-stat__value">{property.frontWidthFt ?? "-"}</div>
+                <div className="detail-stat__label">Front Width</div>
+              </div>
+            )}
+            {isShop && (
+              <div className="detail-stat">
+                <Compass size={18} style={{ color: "var(--color-primary)" }} />
+                <div className="detail-stat__value">
+                  {property.isCornerShop === null ? "-" : property.isCornerShop ? "Yes" : "No"}
+                </div>
+                <div className="detail-stat__label">Corner Shop</div>
+              </div>
+            )}
+            {!isShop && (
+              <div className="detail-stat">
+                <Compass size={18} style={{ color: "var(--color-primary)" }} />
+                <div className="detail-stat__value">{property.facing ?? "-"}</div>
+                <div className="detail-stat__label">Facing</div>
+              </div>
+            )}
             <div className="detail-stat">
               <Eye size={18} style={{ color: "var(--color-primary)" }} />
               <div className="detail-stat__value">{property.viewCount}</div>
@@ -385,15 +412,19 @@ export function PropertyDetailsPage() {
               <div>
                 <strong>Security deposit:</strong> {formatCurrency(property.securityDeposit)}
               </div>
-              <div>
-                <strong>Furnished:</strong> {property.furnishedStatus.replace("_", " ")}
-              </div>
+              {!isShop && (
+                <div>
+                  <strong>Furnished:</strong> {property.furnishedStatus.replace("_", " ")}
+                </div>
+              )}
               <div>
                 <strong>Available from:</strong> {property.availableFrom}
               </div>
-              <div>
-                <strong>Total floors:</strong> {property.totalFloors ?? "-"}
-              </div>
+              {!isShop && (
+                <div>
+                  <strong>Total floors:</strong> {property.totalFloors ?? "-"}
+                </div>
+              )}
               <div>
                 <strong>Category:</strong> {property.category?.name ?? "-"}
               </div>
@@ -402,6 +433,52 @@ export function PropertyDetailsPage() {
               </div>
             </div>
           </div>
+
+          {isShop && (
+            <div className="form-section">
+              <h2>Shop Information</h2>
+              <div className="form-grid" style={{ rowGap: 8 }}>
+                <div>
+                  <strong>Shop carpet area:</strong> {property.areaSqft} sqft
+                </div>
+                <div>
+                  <strong>Front width:</strong> {property.frontWidthFt !== null ? `${property.frontWidthFt} ft` : "-"}
+                </div>
+                <div>
+                  <strong>Shop depth:</strong> {property.shopDepthFt !== null ? `${property.shopDepthFt} ft` : "-"}
+                </div>
+                <div>
+                  <strong>Road width:</strong> {property.roadWidthFt !== null ? `${property.roadWidthFt} ft` : "-"}
+                </div>
+                <div>
+                  <strong>Corner shop:</strong>{" "}
+                  {property.isCornerShop === null ? "-" : property.isCornerShop ? "Yes" : "No"}
+                </div>
+                <div>
+                  <strong>Washroom:</strong> {property.hasWashroom === null ? "-" : property.hasWashroom ? "Yes" : "No"}
+                </div>
+                <div>
+                  <strong>Ready to move:</strong>{" "}
+                  {property.readyToMove === null ? "-" : property.readyToMove ? "Yes" : "No"}
+                </div>
+                <div>
+                  <strong>Power load:</strong> {property.powerLoad ?? "-"}
+                </div>
+              </div>
+              {property.suitableFor.length > 0 && (
+                <div className="amenity-grid" style={{ marginTop: 12 }}>
+                  {property.suitableFor.map((s) => (
+                    <div key={s} className="amenity-item">
+                      <span className="amenity-item__icon">
+                        <Building2 size={16} />
+                      </span>
+                      {s.replace(/_/g, " ")}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {property.features.length > 0 && (
             <div className="form-section">
