@@ -109,6 +109,33 @@ export class UpdatePropertyUseCase {
       }
     }
 
+    // Data-integrity fix: shop-only columns (front_width_ft, shop_depth_ft,
+    // road_width_ft, power_load, is_corner_shop, has_washroom,
+    // ready_to_move, suitable_for) are NULL for every non-shop row *by
+    // construction* -- CreateProperty relies on this, and the Phase 3
+    // Part 1 shop search filters assume it too (they match on these
+    // columns directly, with no propertyType guard, because a non-shop row
+    // should structurally never have them populated). Unlike create,
+    // update previously only ever *copied* whatever the caller sent for
+    // these fields and never cleared them, so a shop edited into an
+    // apartment/house kept its old shop values forever and could
+    // incorrectly resurface in shop-filtered searches. Whenever the
+    // property's resulting type isn't "shop" -- whether this request is
+    // the one changing it, or it was already non-shop -- force every
+    // shop-only column back to null, overriding any (spurious) values the
+    // caller may have also sent for them in the same request.
+    const effectivePropertyType = input.propertyType ?? existing.propertyType;
+    if (effectivePropertyType !== "shop") {
+      patch.frontWidthFt = null;
+      patch.shopDepthFt = null;
+      patch.roadWidthFt = null;
+      patch.powerLoad = null;
+      patch.isCornerShop = null;
+      patch.hasWashroom = null;
+      patch.readyToMove = null;
+      patch.suitableFor = null;
+    }
+
     const statusChanged = input.status !== undefined && input.status !== existing.status;
     if (statusChanged) {
       const isAdmin = input.requesterRoles.some((role) =>

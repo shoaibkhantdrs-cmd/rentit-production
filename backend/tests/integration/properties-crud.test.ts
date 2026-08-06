@@ -228,6 +228,102 @@ test("UpdatePropertyUseCase: re-geocodes only when address changes without expli
   );
 });
 
+test("UpdatePropertyUseCase: clears shop-only fields when propertyType changes away from shop", async () => {
+  const container = buildPropertyTestContainer();
+  const { owner, category } = await setupOwnerAndCategory(container);
+
+  const created = await container.createProperty.execute({
+    ...baseCreateInput(owner.id, category.id),
+    propertyType: "shop",
+    frontWidthFt: 20,
+    shopDepthFt: 30,
+    roadWidthFt: 40,
+    powerLoad: "5 kW / 3-phase",
+    isCornerShop: true,
+    hasWashroom: true,
+    readyToMove: true,
+    suitableFor: ["retail", "clothing"],
+  });
+
+  const beforeUpdate = container.repos.propertyRepo.properties.get(created.id);
+  assert.equal(beforeUpdate?.frontWidthFt, 20);
+  assert.deepEqual(beforeUpdate?.suitableFor, ["retail", "clothing"]);
+
+  // Edit it into an apartment WITHOUT explicitly clearing the shop fields --
+  // this is exactly what the pre-fix client/usecase combination produced,
+  // and is what previously left orphaned shop data on residential rows.
+  const updated = await container.updateProperty.execute({
+    propertyId: created.id,
+    requesterId: owner.id,
+    requesterRoles: ["property_owner"],
+    propertyType: "apartment",
+  });
+  assert.equal(updated.propertyType, "apartment");
+
+  const afterUpdate = container.repos.propertyRepo.properties.get(created.id);
+  assert.equal(afterUpdate?.propertyType, "apartment");
+  assert.equal(afterUpdate?.frontWidthFt, null);
+  assert.equal(afterUpdate?.shopDepthFt, null);
+  assert.equal(afterUpdate?.roadWidthFt, null);
+  assert.equal(afterUpdate?.powerLoad, null);
+  assert.equal(afterUpdate?.isCornerShop, null);
+  assert.equal(afterUpdate?.hasWashroom, null);
+  assert.equal(afterUpdate?.readyToMove, null);
+  assert.equal(afterUpdate?.suitableFor, null);
+});
+
+test("UpdatePropertyUseCase: overrides shop values a caller still sends alongside a type change away from shop", async () => {
+  const container = buildPropertyTestContainer();
+  const { owner, category } = await setupOwnerAndCategory(container);
+
+  const created = await container.createProperty.execute({
+    ...baseCreateInput(owner.id, category.id),
+    propertyType: "shop",
+  });
+
+  await container.updateProperty.execute({
+    propertyId: created.id,
+    requesterId: owner.id,
+    requesterRoles: ["property_owner"],
+    propertyType: "house",
+    // A caller (buggy client, or a resurfaced stale form value) still sends
+    // shop fields in the same request that changes the type away from
+    // shop -- these must be nulled regardless, not just left uncleared.
+    isCornerShop: true,
+    suitableFor: ["retail"],
+  });
+
+  const stored = container.repos.propertyRepo.properties.get(created.id);
+  assert.equal(stored?.propertyType, "house");
+  assert.equal(stored?.isCornerShop, null);
+  assert.equal(stored?.suitableFor, null);
+});
+
+test("UpdatePropertyUseCase: leaves shop fields untouched on an unrelated edit that keeps propertyType as shop", async () => {
+  const container = buildPropertyTestContainer();
+  const { owner, category } = await setupOwnerAndCategory(container);
+
+  const created = await container.createProperty.execute({
+    ...baseCreateInput(owner.id, category.id),
+    propertyType: "shop",
+    isCornerShop: true,
+    suitableFor: ["retail"],
+  });
+
+  const updated = await container.updateProperty.execute({
+    propertyId: created.id,
+    requesterId: owner.id,
+    requesterRoles: ["property_owner"],
+    rentAmount: 45000,
+  });
+
+  assert.equal(updated.rentAmount, 45000);
+  const stored = container.repos.propertyRepo.properties.get(created.id);
+  assert.equal(stored?.propertyType, "shop");
+  assert.equal(stored?.isCornerShop, true);
+  assert.deepEqual(stored?.suitableFor, ["retail"]);
+});
+
 test("UpdatePropertyUseCase: a stranger cannot update someone else's property", async () => {
   const container = buildPropertyTestContainer();
   const { owner, category } = await setupOwnerAndCategory(container);
