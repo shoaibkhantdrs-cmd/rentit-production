@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildPropertyTestContainer } from "../support/buildPropertyTestContainer";
 import { ForbiddenError, NotFoundError } from "@/domain/errors/AppError";
 import { CreatePropertyInput } from "@/application/properties/CreateProperty.usecase";
+import { updatePropertySchema } from "@/interfaces/http/validators/property.schemas";
 
 async function setupOwnerAndCategory(container: ReturnType<typeof buildPropertyTestContainer>) {
   const owner = await container.repos.userRepo.create({
@@ -89,6 +90,93 @@ test("CreatePropertyUseCase: throws NotFoundError for an unknown category", asyn
     () => container.createProperty.execute(baseCreateInput(owner.id, "00000000-0000-0000-0000-000000000000")),
     NotFoundError,
   );
+});
+
+// Phase 3 Part 2, Part 2: CreatePropertyUseCase must never persist the 8
+// shop-only fields for a non-shop property, even if the caller directly
+// sends values for them -- mirrors UpdatePropertyUseCase's existing guard
+// (c2fe84b), which only ran on edit, not on create.
+
+test("CreatePropertyUseCase: non-shop create with malicious/extra shop values stores all eight as null", async () => {
+  const container = buildPropertyTestContainer();
+  const { owner, category } = await setupOwnerAndCategory(container);
+
+  const result = await container.createProperty.execute({
+    ...baseCreateInput(owner.id, category.id),
+    propertyType: "apartment",
+    // A caller directly hitting the API (buggy client, stale form state,
+    // or a malicious request) sends shop-only values alongside a non-shop
+    // propertyType.
+    frontWidthFt: 25,
+    shopDepthFt: 35,
+    roadWidthFt: 45,
+    powerLoad: "10 kW",
+    isCornerShop: true,
+    hasWashroom: true,
+    readyToMove: true,
+    suitableFor: ["retail", "clothing"],
+  });
+
+  assert.equal(result.propertyType, "apartment");
+
+  const stored = container.repos.propertyRepo.properties.get(result.id);
+  assert.equal(stored?.frontWidthFt, null);
+  assert.equal(stored?.shopDepthFt, null);
+  assert.equal(stored?.roadWidthFt, null);
+  assert.equal(stored?.powerLoad, null);
+  assert.equal(stored?.isCornerShop, null);
+  assert.equal(stored?.hasWashroom, null);
+  assert.equal(stored?.readyToMove, null);
+  assert.equal(stored?.suitableFor, null);
+});
+
+test("CreatePropertyUseCase: genuine shop create preserves the supplied shop field values exactly", async () => {
+  const container = buildPropertyTestContainer();
+  const { owner, category } = await setupOwnerAndCategory(container);
+
+  const result = await container.createProperty.execute({
+    ...baseCreateInput(owner.id, category.id),
+    propertyType: "shop",
+    floorNumber: 1,
+    location: { ...baseCreateInput(owner.id, category.id).location, postalCode: "411045" },
+    frontWidthFt: 20,
+    shopDepthFt: 30,
+    roadWidthFt: 40,
+    powerLoad: "5 kW / 3-phase",
+    isCornerShop: true,
+    hasWashroom: true,
+    readyToMove: true,
+    suitableFor: ["retail", "clothing"],
+  });
+
+  assert.equal(result.propertyType, "shop");
+
+  const stored = container.repos.propertyRepo.properties.get(result.id);
+  assert.equal(stored?.frontWidthFt, 20);
+  assert.equal(stored?.shopDepthFt, 30);
+  assert.equal(stored?.roadWidthFt, 40);
+  assert.equal(stored?.powerLoad, "5 kW / 3-phase");
+  assert.equal(stored?.isCornerShop, true);
+  assert.equal(stored?.hasWashroom, true);
+  assert.equal(stored?.readyToMove, true);
+  assert.deepEqual(stored?.suitableFor, ["retail", "clothing"]);
+});
+
+test("CreatePropertyUseCase: normal non-shop create with no shop fields sent stores all eight as null (existing behavior unchanged)", async () => {
+  const container = buildPropertyTestContainer();
+  const { owner, category } = await setupOwnerAndCategory(container);
+
+  const result = await container.createProperty.execute(baseCreateInput(owner.id, category.id));
+
+  const stored = container.repos.propertyRepo.properties.get(result.id);
+  assert.equal(stored?.frontWidthFt, null);
+  assert.equal(stored?.shopDepthFt, null);
+  assert.equal(stored?.roadWidthFt, null);
+  assert.equal(stored?.powerLoad, null);
+  assert.equal(stored?.isCornerShop, null);
+  assert.equal(stored?.hasWashroom, null);
+  assert.equal(stored?.readyToMove, null);
+  assert.equal(stored?.suitableFor, null);
 });
 
 test("GetPropertyUseCase: 404s for a stranger viewing an unpublished listing, but owner can see it", async () => {
@@ -384,4 +472,78 @@ test("DeletePropertyUseCase: soft-deletes and records a 'removed' status history
 
   const history = container.repos.statusHistoryRepo.entries;
   assert.equal(history[history.length - 1].newStatus, "removed");
+});
+
+// Phase 3 Part 2, Part 3: updatePropertySchema must require Floor + PIN
+// when a request converts an existing property to "shop" -- mirrors
+// createPropertySchema's existing superRefine. Scoped to requests that
+// explicitly set propertyType: "shop" in their own payload (see the
+// doc-comment on updatePropertySchema in property.schemas.ts for why: the
+// schema has no access to the existing DB row, so it cannot safely
+// enforce this for a patch that omits propertyType entirely).
+
+function baseUpdatePayload(overrides: Record<string, unknown> = {}) {
+  return {
+    rentAmount: 42000,
+    ...overrides,
+  };
+}
+
+test("updatePropertySchema: converting to shop without floorNumber or PIN code fails validation", () => {
+  const result = updatePropertySchema.safeParse(
+    baseUpdatePayload({
+      propertyType: "shop",
+      location: { addressLine: "221B Baner Road", city: "Pune" },
+    }),
+  );
+
+  assert.equal(result.success, false);
+  if (!result.success) {
+    const paths = result.error.issues.map((issue) => issue.path.join("."));
+    assert.ok(paths.includes("floorNumber"), "expected a floorNumber issue");
+    assert.ok(paths.includes("location.postalCode"), "expected a location.postalCode issue");
+  }
+});
+
+test("updatePropertySchema: converting to shop with valid floorNumber and PIN code passes validation", () => {
+  const result = updatePropertySchema.safeParse(
+    baseUpdatePayload({
+      propertyType: "shop",
+      floorNumber: 1,
+      location: { addressLine: "221B Baner Road", city: "Pune", postalCode: "411045" },
+    }),
+  );
+
+  assert.equal(result.success, true);
+});
+
+test("updatePropertySchema: an unrelated partial edit that omits propertyType is never blocked by the shop requirement", () => {
+  // Simulates a partial edit to a property that may already be "shop" in
+  // the database -- propertyType is not resent, so the schema (which
+  // cannot see the existing row) must not attempt to enforce floor/PIN
+  // here. This is the exact "legitimate partial update must not
+  // incorrectly fail" case called out for this validator.
+  const result = updatePropertySchema.safeParse(baseUpdatePayload({ rentAmount: 50000 }));
+  assert.equal(result.success, true);
+});
+
+test("updatePropertySchema: converting away from shop introduces no new requirement", () => {
+  const result = updatePropertySchema.safeParse(
+    baseUpdatePayload({ propertyType: "apartment" }),
+  );
+  assert.equal(result.success, true);
+});
+
+test("updatePropertySchema: converting to shop does not require any of the other shop-only fields", () => {
+  const result = updatePropertySchema.safeParse(
+    baseUpdatePayload({
+      propertyType: "shop",
+      floorNumber: 2,
+      location: { addressLine: "221B Baner Road", city: "Pune", postalCode: "411045" },
+      // frontWidthFt, shopDepthFt, roadWidthFt, powerLoad, isCornerShop,
+      // hasWashroom, readyToMove, suitableFor are all intentionally
+      // omitted here.
+    }),
+  );
+  assert.equal(result.success, true);
 });

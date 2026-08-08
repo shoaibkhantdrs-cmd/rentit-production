@@ -28,7 +28,11 @@ interface PropertyRow {
   total_floors: number | null;
   facing: Property["facing"];
   furnished_status: Property["furnishedStatus"];
-  available_from: string;
+  // node-postgres returns a Postgres DATE column as a JS Date object by
+  // default (not a string) -- this type previously claimed `string`,
+  // which masked the bug fixed by formatDateOnly() below. Kept as the
+  // union it actually is at runtime.
+  available_from: string | Date;
   view_count: number;
   favorite_count: number;
   published_at: Date | null;
@@ -51,6 +55,48 @@ interface PropertyRow {
   distance_km?: string;
 }
 
+/**
+ * Phase 3 Part 2: normalizes a Postgres DATE value to YYYY-MM-DD.
+ *
+ * Root cause: node-postgres returns a DATE column as a JS Date object by
+ * default (not a string). The previous `typeof row.available_from ===
+ * "string"` check in toEntity() therefore never matched in production --
+ * the raw Date object fell through to the `: row.available_from` branch
+ * unnormalized. That Date object then serialized via JSON.stringify's
+ * implicit toISOString() call into a full ISO datetime string (e.g.
+ * "2026-08-10T00:00:00.000Z") in the HTTP response. Native
+ * `<input type="date">` elements require an exact YYYY-MM-DD value and
+ * silently reject anything else, leaving Edit Property's Available From
+ * field empty and blocking Save via the `required` attribute with zero
+ * network request -- confirmed live in production prior to this fix.
+ *
+ * Timezone fix (found in code review, before this ever shipped): the
+ * `postgres-date` package (node-postgres's DATE parser) builds that Date
+ * object with the *local-time* multi-arg constructor --
+ * `new Date(year, month, day)` -- not a UTC-anchored one. Reading it back
+ * out with `.toISOString()` converts to UTC, which in any positive
+ * UTC-offset timezone (e.g. Asia/Kolkata, IST = UTC+5:30) rolls the
+ * calendar date back by one day: local midnight on the 10th is 18:30 UTC
+ * on the 9th. Using the Date object's own local getters instead
+ * (getFullYear/getMonth/getDate) is the symmetric inverse of how the
+ * value was constructed, so it's correct regardless of server timezone.
+ *
+ * Handles a Date, an already-correct "YYYY-MM-DD" string, a longer ISO
+ * datetime string (defensive, in case a driver/config change ever returns
+ * dates as full ISO strings instead of Date objects), and null/undefined.
+ * Does not change the database column type.
+ */
+export function formatDateOnly(value: string | Date | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  return value.slice(0, 10);
+}
+
 function toEntity(row: PropertyRow): Property {
   return {
     id: row.id,
@@ -70,7 +116,7 @@ function toEntity(row: PropertyRow): Property {
     totalFloors: row.total_floors,
     facing: row.facing,
     furnishedStatus: row.furnished_status,
-    availableFrom: typeof row.available_from === "string" ? row.available_from.slice(0, 10) : row.available_from,
+    availableFrom: formatDateOnly(row.available_from),
     viewCount: row.view_count,
     favoriteCount: row.favorite_count,
     publishedAt: row.published_at,

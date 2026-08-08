@@ -67,6 +67,19 @@ export class CreatePropertyUseCase {
       throw new NotFoundError("Property category not found");
     }
 
+    // Phase 3 Part 2: mirrors UpdatePropertyUseCase's guard (c2fe84b) at
+    // create time. Previously these 8 fields were stored as
+    // `input.X ?? null` with no check on propertyType at all -- trusting
+    // the caller to only ever send shop values when propertyType ===
+    // "shop" (true for the current frontend form, but not defended
+    // against a direct/malformed API call creating e.g. an "apartment"
+    // with shop fields populated, which is exactly the class of legacy
+    // row the b53e557 backfill had to clean up after the fact). Forcing
+    // these to null here whenever the property isn't being created as
+    // "shop" prevents that class of row from ever being created going
+    // forward, regardless of what the caller sends.
+    const isShop = input.propertyType === "shop";
+
     const property = await this.propertyRepo.create({
       ownerId: input.ownerId,
       categoryId: input.categoryId,
@@ -84,14 +97,14 @@ export class CreatePropertyUseCase {
       facing: input.facing ?? null,
       furnishedStatus: input.furnishedStatus,
       availableFrom: input.availableFrom,
-      frontWidthFt: input.frontWidthFt ?? null,
-      shopDepthFt: input.shopDepthFt ?? null,
-      roadWidthFt: input.roadWidthFt ?? null,
-      powerLoad: input.powerLoad ?? null,
-      isCornerShop: input.isCornerShop ?? null,
-      hasWashroom: input.hasWashroom ?? null,
-      readyToMove: input.readyToMove ?? null,
-      suitableFor: input.suitableFor ?? null,
+      frontWidthFt: isShop ? input.frontWidthFt ?? null : null,
+      shopDepthFt: isShop ? input.shopDepthFt ?? null : null,
+      roadWidthFt: isShop ? input.roadWidthFt ?? null : null,
+      powerLoad: isShop ? input.powerLoad ?? null : null,
+      isCornerShop: isShop ? input.isCornerShop ?? null : null,
+      hasWashroom: isShop ? input.hasWashroom ?? null : null,
+      readyToMove: isShop ? input.readyToMove ?? null : null,
+      suitableFor: isShop ? input.suitableFor ?? null : null,
     });
 
     let latitude = input.location.latitude;

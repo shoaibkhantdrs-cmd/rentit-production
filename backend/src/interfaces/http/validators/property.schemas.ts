@@ -137,37 +137,85 @@ export const createPropertySchema = z
     }
   });
 
-export const updatePropertySchema = z.object({
-  title: z.string().min(5).max(200).optional(),
-  description: z.string().min(20).max(5000).optional(),
-  categoryId: z.string().uuid().optional(),
-  propertyType: propertyTypeEnum.optional(),
-  status: statusEnum.optional(),
-  rentAmount: z.number().min(0).optional(),
-  securityDeposit: z.number().min(0).optional(),
-  areaSqft: z.number().positive().optional(),
-  bedrooms: z.number().int().min(0).optional(),
-  bathrooms: z.number().int().min(0).optional(),
-  parkingSpaces: z.number().int().min(0).optional(),
-  floorNumber: z.number().int().nullable().optional(),
-  totalFloors: z.number().int().nullable().optional(),
-  facing: facingEnum.nullable().optional(),
-  furnishedStatus: furnishedStatusEnum.optional(),
-  availableFrom: dateOnly.optional(),
-  features: z.array(featureKeyEnum).max(20).optional(),
-  location: locationSchema.partial().optional(),
-  // Phase 2 Part 2 (Shop Listing UI). Not conditionally required on update
-  // -- a partial edit (e.g. photos-only) shouldn't be blocked by an
-  // unrelated shop field being absent from this particular request.
-  frontWidthFt: z.number().min(0).nullable().optional(),
-  shopDepthFt: z.number().min(0).nullable().optional(),
-  roadWidthFt: z.number().min(0).nullable().optional(),
-  powerLoad: z.string().max(60).nullable().optional(),
-  isCornerShop: z.boolean().nullable().optional(),
-  hasWashroom: z.boolean().nullable().optional(),
-  readyToMove: z.boolean().nullable().optional(),
-  suitableFor: z.array(suitableForEnum).max(SUITABLE_FOR_KEYS.length).nullable().optional(),
-});
+export const updatePropertySchema = z
+  .object({
+    title: z.string().min(5).max(200).optional(),
+    description: z.string().min(20).max(5000).optional(),
+    categoryId: z.string().uuid().optional(),
+    propertyType: propertyTypeEnum.optional(),
+    status: statusEnum.optional(),
+    rentAmount: z.number().min(0).optional(),
+    securityDeposit: z.number().min(0).optional(),
+    areaSqft: z.number().positive().optional(),
+    bedrooms: z.number().int().min(0).optional(),
+    bathrooms: z.number().int().min(0).optional(),
+    parkingSpaces: z.number().int().min(0).optional(),
+    floorNumber: z.number().int().nullable().optional(),
+    totalFloors: z.number().int().nullable().optional(),
+    facing: facingEnum.nullable().optional(),
+    furnishedStatus: furnishedStatusEnum.optional(),
+    availableFrom: dateOnly.optional(),
+    features: z.array(featureKeyEnum).max(20).optional(),
+    location: locationSchema.partial().optional(),
+    // Phase 2 Part 2 (Shop Listing UI). Not conditionally required on update
+    // -- a partial edit (e.g. photos-only) shouldn't be blocked by an
+    // unrelated shop field being absent from this particular request.
+    frontWidthFt: z.number().min(0).nullable().optional(),
+    shopDepthFt: z.number().min(0).nullable().optional(),
+    roadWidthFt: z.number().min(0).nullable().optional(),
+    powerLoad: z.string().max(60).nullable().optional(),
+    isCornerShop: z.boolean().nullable().optional(),
+    hasWashroom: z.boolean().nullable().optional(),
+    readyToMove: z.boolean().nullable().optional(),
+    suitableFor: z.array(suitableForEnum).max(SUITABLE_FOR_KEYS.length).nullable().optional(),
+  })
+  // Phase 3 Part 2: require Floor + PIN when a request converts an
+  // existing property to "shop" -- mirrors createPropertySchema's
+  // superRefine above, but with an important PATCH-semantics caveat.
+  //
+  // updatePropertySchema only ever sees this one request body, never the
+  // property's existing DB row -- UpdatePropertyUseCase.execute() is what
+  // computes `effectivePropertyType = input.propertyType ?? existing.propertyType`
+  // (see UpdateProperty.usecase.ts), and that merge happens *after* this
+  // schema has already validated the raw payload. A schema-level check
+  // therefore cannot know whether an already-shop property (whose
+  // propertyType is simply omitted from this particular patch) already
+  // has a floor/PIN on file, and must not guess.
+  //
+  // This check is deliberately scoped to only the request that explicitly
+  // sets propertyType: "shop" in its own payload -- i.e. "the request
+  // that performs the conversion must supply Floor and PIN in that same
+  // request". Concretely:
+  //   - An unrelated partial edit to an already-shop listing that doesn't
+  //     resend propertyType (data.propertyType is undefined) never
+  //     triggers this check, so it can never incorrectly fail -- exactly
+  //     the case the previous "not conditionally required on update"
+  //     comment above was protecting.
+  //   - A request that does set propertyType: "shop" must also carry
+  //     floorNumber and location.postalCode in that same request.
+  //     PropertyForm.tsx always resubmits its full current form state
+  //     (not a sparse patch) on save, so a real conversion performed
+  //     through the product UI already includes both fields naturally;
+  //     this only blocks a bare/malformed API call that tries to convert
+  //     a listing to "shop" without ever supplying Floor/PIN.
+  .superRefine((data, ctx) => {
+    if (data.propertyType !== "shop") return;
+    if (data.floorNumber === undefined || data.floorNumber === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["floorNumber"],
+        message: "Floor is required when converting a listing to a shop",
+      });
+    }
+    const postalCode = data.location?.postalCode;
+    if (!postalCode || !postalCode.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["location", "postalCode"],
+        message: "PIN code is required when converting a listing to a shop",
+      });
+    }
+  });
 
 export const searchPropertiesQuerySchema = z.object({
   category: z.string().max(100).optional(),
