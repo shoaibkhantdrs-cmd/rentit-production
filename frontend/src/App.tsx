@@ -1,5 +1,5 @@
 import { ReactNode, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { HomePage } from "@/pages/HomePage";
 import { SearchPage } from "@/pages/SearchPage";
@@ -81,6 +81,25 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/properties/new" element={<Lazy><AddPropertyPage /></Lazy>} />
+        {/* Production bug fix: "My Properties" has always lived at
+            /my-properties (see the route below and every in-app Link/
+            navigate() to it -- Layout.tsx, AddPropertyPage.tsx,
+            PropertyDetailsPage.tsx, ProfilePage.tsx). No route ever existed
+            for /properties/mine, so that literal path fell through to
+            /properties/:id below with id="mine", which made
+            PropertyDetailsPage call GET /properties/mine expecting a single
+            PropertyDetail -- but the backend resolves that exact path to
+            the *list* endpoint (GetMyPropertiesUseCase), returning a
+            paginated {items, total, ...} body instead. PropertyDetailsPage
+            then rendered that mismatched shape as if it were a property
+            (e.g. property.status.replace(...) with no `status` key present),
+            throwing and white-screening. Nothing in the app ever links to
+            /properties/mine, so real users never hit this via normal
+            navigation, but the exact URL is a live production crash if
+            reached directly (bookmark, shared link, crawler). Redirecting
+            it to the real route closes that gap without touching the
+            PropertyDetailsPage rendering logic or any backend code. */}
+        <Route path="/properties/mine" element={<Navigate to="/my-properties" replace />} />
         <Route path="/properties/:id" element={<PropertyDetailsPage />} />
         <Route path="/properties/:id/edit" element={<Lazy><EditPropertyPage /></Lazy>} />
         <Route path="/my-properties" element={<Lazy><MyPropertiesPage /></Lazy>} />
