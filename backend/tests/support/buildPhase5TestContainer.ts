@@ -26,6 +26,7 @@ import { NotifySavedSearchesForPropertyUseCase } from "@/application/savedsearch
 import { GetRecentlyViewedUseCase } from "@/application/properties/GetRecentlyViewed.usecase";
 import { GetRecommendationsUseCase } from "@/application/properties/GetRecommendations.usecase";
 import { PropertyDetailLoader } from "@/application/properties/shared/PropertyDetailLoader";
+import { GetOwnerDashboardStatsUseCase } from "@/application/properties/GetOwnerDashboardStats.usecase";
 
 import { FakeClock } from "./fakes/FakeClock";
 import { FakeImageStorageService } from "./fakes/FakeImageStorageService";
@@ -53,6 +54,7 @@ import { InMemoryPropertyViewRepository } from "./fakes/InMemoryPropertyViewRepo
 import { InMemoryConversationRepository } from "./fakes/InMemoryConversationRepository";
 import { InMemoryMessageRepository } from "./fakes/InMemoryMessageRepository";
 import { InMemorySavedSearchRepository } from "./fakes/InMemorySavedSearchRepository";
+import { InMemoryOwnerDashboardRepository } from "./fakes/InMemoryOwnerDashboardRepository";
 
 /**
  * Wires every net-new Phase 5 use-case (chat, notification preferences,
@@ -94,6 +96,11 @@ export function buildPhase5TestContainer() {
   const conversationRepo = new InMemoryConversationRepository(messageRepo);
 
   const savedSearchRepo = new InMemorySavedSearchRepository();
+
+  // Phase 3 Part 3 (Owner Dashboard, must-have slice). Needs both
+  // propertyRepo and conversationRepo, which this container already wires
+  // for chat -- see InMemoryOwnerDashboardRepository's doc comment.
+  const ownerDashboardRepo = new InMemoryOwnerDashboardRepository(propertyRepo, conversationRepo);
 
   const propertyDetailLoader = new PropertyDetailLoader(
     propertyCategoryRepo,
@@ -155,6 +162,7 @@ export function buildPhase5TestContainer() {
     propertyFavoriteRepo,
     propertyDetailLoader,
   );
+  const getOwnerDashboardStats = new GetOwnerDashboardStatsUseCase(ownerDashboardRepo);
 
   return {
     clock,
@@ -185,6 +193,7 @@ export function buildPhase5TestContainer() {
     notifySavedSearchesForProperty,
     getRecentlyViewed,
     getRecommendations,
+    getOwnerDashboardStats,
     repos: {
       userRepo,
       roleRepo,
@@ -202,6 +211,7 @@ export function buildPhase5TestContainer() {
       conversationRepo,
       messageRepo,
       savedSearchRepo,
+      ownerDashboardRepo,
     },
   };
 }

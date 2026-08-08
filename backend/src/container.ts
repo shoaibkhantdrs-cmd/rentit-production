@@ -39,6 +39,7 @@ import { UserReportRepository } from "@/infrastructure/database/repositories/Use
 import { IdentityVerificationRepository } from "@/infrastructure/database/repositories/IdentityVerificationRepository";
 import { AdminAnalyticsRepository } from "@/infrastructure/database/repositories/AdminAnalyticsRepository";
 import { PlatformStatsRepository } from "@/infrastructure/database/repositories/PlatformStatsRepository";
+import { OwnerDashboardRepository } from "@/infrastructure/database/repositories/OwnerDashboardRepository";
 import { CloudinaryImageStorageService } from "@/infrastructure/storage/CloudinaryImageStorageService";
 import { NominatimGeocodingService } from "@/infrastructure/maps/NominatimGeocodingService";
 import { ConsolePushNotificationService } from "@/infrastructure/notifications/ConsolePushNotificationService";
@@ -108,6 +109,7 @@ import { GetMyPropertiesUseCase } from "@/application/properties/GetMyProperties
 import { GetMyFavoritesUseCase } from "@/application/properties/GetMyFavorites.usecase";
 import { ListPropertyCategoriesUseCase } from "@/application/properties/ListPropertyCategories.usecase";
 import { GetPlatformStatsUseCase } from "@/application/properties/GetPlatformStats.usecase";
+import { GetOwnerDashboardStatsUseCase } from "@/application/properties/GetOwnerDashboardStats.usecase";
 import { ReportUserUseCase } from "@/application/users/ReportUser.usecase";
 import { GetRecentlyViewedUseCase } from "@/application/properties/GetRecentlyViewed.usecase";
 import { GetRecommendationsUseCase } from "@/application/properties/GetRecommendations.usecase";
@@ -243,6 +245,7 @@ export function buildContainer() {
   const identityVerificationRepo = new IdentityVerificationRepository(pool);
   const adminAnalyticsRepo = new AdminAnalyticsRepository(pool);
   const platformStatsRepo = new PlatformStatsRepository(pool);
+  const ownerDashboardRepo = new OwnerDashboardRepository(pool);
   const conversationRepo = new ConversationRepository(pool);
   const messageRepo = new MessageRepository(pool);
   const savedSearchRepo = new SavedSearchRepository(pool);
@@ -500,6 +503,7 @@ export function buildContainer() {
   const getMyFavorites = new GetMyFavoritesUseCase(propertyRepo, propertyFavoriteRepo, propertyDetailLoader);
   const listPropertyCategories = new ListPropertyCategoriesUseCase(propertyCategoryRepo);
   const getPlatformStats = new GetPlatformStatsUseCase(platformStatsRepo);
+  const getOwnerDashboardStats = new GetOwnerDashboardStatsUseCase(ownerDashboardRepo);
   const reportUser = new ReportUserUseCase(userRepo, userReportRepo, auditLogRepo);
   const getRecentlyViewed = new GetRecentlyViewedUseCase(propertyRepo, propertyViewRepo, propertyDetailLoader);
   const getRecommendations = new GetRecommendationsUseCase(
@@ -868,6 +872,7 @@ export function buildContainer() {
     getPlatformStats,
     getRecentlyViewed,
     getRecommendations,
+    getOwnerDashboardStats,
   );
 
   const paymentController = new PaymentController(

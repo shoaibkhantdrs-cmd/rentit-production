@@ -33,6 +33,10 @@ export function createPropertyRouter(
     validate(paginationQuerySchema, "query"),
     asyncHandler(controller.mine),
   );
+  // Phase 3 Part 3 (Owner Dashboard, must-have slice). No query params, so
+  // no validate() call -- kept next to "/mine" for the same route-ordering
+  // reason as the rest of this block (must come before "/:id").
+  router.get("/mine/stats", authenticate, asyncHandler(controller.myStats));
   router.get(
     "/favorites",
     authenticate,

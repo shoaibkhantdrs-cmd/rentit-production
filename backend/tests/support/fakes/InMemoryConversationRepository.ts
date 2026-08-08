@@ -12,7 +12,11 @@ interface ParticipantRow {
 }
 
 export class InMemoryConversationRepository implements IConversationRepository {
-  private readonly conversations = new Map<string, Conversation>();
+  // Phase 3 Part 3 (Owner Dashboard): public so InMemoryOwnerDashboardRepository
+  // can read across this fake's state the same way InMemoryAdminAnalyticsRepository
+  // already reads across InMemoryPropertyRepository/InMemoryPropertyFavoriteRepository/etc.
+  // -- a visibility change only, no behavior here is altered.
+  public readonly conversations = new Map<string, Conversation>();
   private readonly participants = new Map<string, ParticipantRow[]>();
 
   /** Needs the same message store the real Postgres query joins against

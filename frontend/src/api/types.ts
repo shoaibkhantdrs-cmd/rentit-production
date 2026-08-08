@@ -194,6 +194,16 @@ export interface PaginatedResult<T> {
   pageSize: number;
 }
 
+// Phase 3 Part 3 (Owner Dashboard, must-have slice). Real, owner-wide
+// totals from GET /properties/mine/stats -- not derived by summing a
+// single page of listings client-side.
+export interface OwnerDashboardStats {
+  totalListings: number;
+  totalViews: number;
+  totalFavorites: number;
+  totalEnquiries: number;
+}
+
 export interface SearchFilters {
   category?: string;
   propertyType?: PropertyType;

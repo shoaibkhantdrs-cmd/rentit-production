@@ -1,6 +1,7 @@
 import { httpClient } from "./httpClient";
 import {
   CreatePropertyPayload,
+  OwnerDashboardStats,
   PaginatedResult,
   PlatformStats,
   PostalCodeLookupResult,
@@ -105,6 +106,12 @@ export const propertiesApi = {
 
   favorites: (page: number, pageSize: number) =>
     httpClient.get<PaginatedResult<PropertyDetail>>("/properties/favorites", { page, pageSize }),
+
+  // Phase 3 Part 3 (Owner Dashboard, must-have slice). Real, owner-wide
+  // totals -- replaces the page-local sums MyPropertiesPage used to
+  // compute itself. Per-user live data, so no caching (unlike stats()
+  // above, which is a public, slow-moving aggregate).
+  myStats: () => httpClient.get<OwnerDashboardStats>("/properties/mine/stats"),
 
   // Phase 5 Parts 6-7.
   recentlyViewed: () => httpClient.get<{ items: PropertyDetail[] }>("/properties/recently-viewed"),

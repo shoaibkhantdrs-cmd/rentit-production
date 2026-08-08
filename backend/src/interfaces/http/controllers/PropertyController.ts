@@ -18,6 +18,7 @@ import { ListPropertyCategoriesUseCase } from "@/application/properties/ListProp
 import { GetPlatformStatsUseCase } from "@/application/properties/GetPlatformStats.usecase";
 import { GetRecentlyViewedUseCase } from "@/application/properties/GetRecentlyViewed.usecase";
 import { GetRecommendationsUseCase } from "@/application/properties/GetRecommendations.usecase";
+import { GetOwnerDashboardStatsUseCase } from "@/application/properties/GetOwnerDashboardStats.usecase";
 import { UnauthorizedError, ValidationError } from "@/domain/errors/AppError";
 import {
   createPropertySchema,
@@ -50,6 +51,7 @@ export class PropertyController {
     private readonly getPlatformStats: GetPlatformStatsUseCase,
     private readonly getRecentlyViewed: GetRecentlyViewedUseCase,
     private readonly getRecommendations: GetRecommendationsUseCase,
+    private readonly getOwnerDashboardStats: GetOwnerDashboardStatsUseCase,
   ) {}
 
   create = async (req: Request, res: Response): Promise<void> => {
@@ -197,6 +199,15 @@ export class PropertyController {
       page: query.page,
       pageSize: query.pageSize,
     });
+    res.status(200).json(result);
+  };
+
+  // Phase 3 Part 3 (Owner Dashboard, must-have slice). ownerId is always
+  // req.user.sub -- never accepted from a query/body/path parameter -- so
+  // this can only ever return the authenticated caller's own totals.
+  myStats = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new UnauthorizedError();
+    const result = await this.getOwnerDashboardStats.execute({ ownerId: req.user.sub });
     res.status(200).json(result);
   };
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, Heart, ListChecks, TrendingUp } from "lucide-react";
+import { Eye, Heart, ListChecks, MessageCircle, TrendingUp } from "lucide-react";
 import { propertiesApi } from "@/api/properties";
 import { useAsync } from "@/hooks/useAsync";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -15,18 +15,19 @@ function MyPropertiesList() {
   const [page, setPage] = useState(1);
   const { status, data, error, reload } = useAsync(() => propertiesApi.mine(page, 20), [page]);
 
-  // Real performance numbers straight off the listings themselves
-  // (viewCount/favoriteCount are genuine backend fields) -- no click
-  // analytics, boost status, or inquiry counts are fabricated here since
-  // no endpoint exposes them yet (see Phase 4 report for what that would
-  // take). Totals reflect this page only when there's more than one.
-  const pageViews = status === "success" ? data.items.reduce((sum, p) => sum + p.viewCount, 0) : 0;
-  const pageFavorites = status === "success" ? data.items.reduce((sum, p) => sum + p.favoriteCount, 0) : 0;
+  // Phase 3 Part 3 (Owner Dashboard, must-have slice): real, owner-wide
+  // totals from a dedicated endpoint, independent of the paginated listing
+  // fetch above (these numbers cover every listing this owner has, not
+  // just whichever page is currently showing). Replaces the old
+  // page-local pageViews/pageFavorites reduce(), which only ever summed
+  // the up-to-20 items on the current page and silently underreported for
+  // any owner with more than one page of listings.
+  const stats = useAsync(() => propertiesApi.myStats(), []);
+
   const mostViewed =
     status === "success" && data.items.length > 0
       ? data.items.reduce((a, b) => (b.viewCount > a.viewCount ? b : a))
       : null;
-  const hasMultiplePages = status === "success" && data.total > data.items.length;
 
   return (
     <div>
@@ -46,14 +47,17 @@ function MyPropertiesList() {
           <StatCard
             icon={<Eye size={18} />}
             label="Views"
-            value={pageViews}
-            hint={hasMultiplePages ? "This page" : undefined}
+            value={stats.status === "success" ? stats.data.totalViews : 0}
           />
           <StatCard
             icon={<Heart size={18} />}
             label="Favorites"
-            value={pageFavorites}
-            hint={hasMultiplePages ? "This page" : undefined}
+            value={stats.status === "success" ? stats.data.totalFavorites : 0}
+          />
+          <StatCard
+            icon={<MessageCircle size={18} />}
+            label="Enquiries"
+            value={stats.status === "success" ? stats.data.totalEnquiries : 0}
           />
           {mostViewed ? (
             <StatCard
