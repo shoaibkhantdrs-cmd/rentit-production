@@ -35,6 +35,27 @@ if (nodeEnv !== "development" && !process.env.JWT_ACCESS_SECRET) {
   );
 }
 
+// Same fail-closed rationale as the JWT guard above. RazorpayPaymentGateway
+// and StripePaymentGateway are both always constructed in container.ts
+// (see its "Phase 6 Part 1: payment gateways" comment) and both webhook
+// routes are always live in WebhookController, regardless of whether real
+// API keys are configured for either provider. If either secret is unset,
+// verifyWebhookSignature() HMACs against an empty string -- which anyone
+// can replicate without knowing any real secret -- so a forged request
+// (e.g. a fake payment.succeeded/refund.processed event) would verify as
+// genuine. "development" is the only environment where booting without a
+// real webhook secret is intentional.
+if (nodeEnv !== "development" && !process.env.RAZORPAY_WEBHOOK_SECRET) {
+  throw new Error(
+    `RAZORPAY_WEBHOOK_SECRET must be set when NODE_ENV is not "development" (got: "${nodeEnv}")`,
+  );
+}
+if (nodeEnv !== "development" && !process.env.STRIPE_WEBHOOK_SECRET) {
+  throw new Error(
+    `STRIPE_WEBHOOK_SECRET must be set when NODE_ENV is not "development" (got: "${nodeEnv}")`,
+  );
+}
+
 export const env = {
   nodeEnv,
   isProduction,
