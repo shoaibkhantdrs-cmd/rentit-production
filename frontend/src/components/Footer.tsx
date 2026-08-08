@@ -23,7 +23,7 @@ const FOOTER_COLUMNS: { title: string; links: { label: string; href: string }[] 
     title: "Support",
     links: [
       { label: "Help center", href: "/" },
-      { label: "Contact us", href: "/" },
+      { label: "Contact us", href: "/contact" },
       { label: "Trust & safety", href: "/" },
       { label: "Sitemap", href: "/" },
     ],
@@ -31,8 +31,8 @@ const FOOTER_COLUMNS: { title: string; links: { label: string; href: string }[] 
   {
     title: "Legal",
     links: [
-      { label: "Terms of service", href: "/" },
-      { label: "Privacy policy", href: "/" },
+      { label: "Terms of service", href: "/terms" },
+      { label: "Privacy policy", href: "/privacy-policy" },
       { label: "Cookie policy", href: "/" },
     ],
   },

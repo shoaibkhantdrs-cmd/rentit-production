@@ -32,6 +32,12 @@ const PaymentHistoryPage = lazyNamed(() => import("@/pages/PaymentHistoryPage"),
 const BoostListingPage = lazyNamed(() => import("@/pages/BoostListingPage"), "BoostListingPage");
 const ComparePage = lazyNamed(() => import("@/pages/ComparePage"), "ComparePage");
 const ProfilePage = lazyNamed(() => import("@/pages/ProfilePage"), "ProfilePage");
+// Roadmap Item 1: static legal/support pages -- low-traffic, never a cold
+// direct-load target the way Home/Search/Property Details are, so they
+// follow the same lazy-split pattern as every other secondary page above.
+const PrivacyPolicyPage = lazyNamed(() => import("@/pages/PrivacyPolicyPage"), "PrivacyPolicyPage");
+const TermsOfServicePage = lazyNamed(() => import("@/pages/TermsOfServicePage"), "TermsOfServicePage");
+const ContactPage = lazyNamed(() => import("@/pages/ContactPage"), "ContactPage");
 
 function PageFallback() {
   return (
@@ -114,6 +120,9 @@ function App() {
         <Route path="/properties/:id/boost" element={<Lazy><BoostListingPage /></Lazy>} />
         <Route path="/compare" element={<Lazy><ComparePage /></Lazy>} />
         <Route path="/profile" element={<Lazy><ProfilePage /></Lazy>} />
+        <Route path="/privacy-policy" element={<Lazy><PrivacyPolicyPage /></Lazy>} />
+        <Route path="/terms" element={<Lazy><TermsOfServicePage /></Lazy>} />
+        <Route path="/contact" element={<Lazy><ContactPage /></Lazy>} />
       </Route>
 
       <Route
