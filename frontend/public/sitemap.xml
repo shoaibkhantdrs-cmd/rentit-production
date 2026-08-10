@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  RentIt: first draft static sitemap. Lists the pages that are genuinely
+  public, content-bearing, and don't require sign-in (matches robots.txt's
+  Allow/Disallow split). Individual property listing pages
+  (/properties/:id) are deliberately NOT included here: they're real,
+  valuable, indexable content, but this is a static frontend deploy
+  (render.yaml runtime: static) with no server-side rendering step, so
+  there's no build-time hook that can enumerate live listing IDs from the
+  database into this file. Generating that requires a small backend
+  endpoint (e.g. GET /properties/sitemap-ids, published listings only)
+  feeding a dynamically built sitemap, a real follow-up, not done here to
+  keep this change to the same "smallest correct fix" scope as the rest of
+  this session's work.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://rentit-frontend-gd1c.onrender.com/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://rentit-frontend-gd1c.onrender.com/search</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://rentit-frontend-gd1c.onrender.com/premium-plans</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://rentit-frontend-gd1c.onrender.com/contact</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://rentit-frontend-gd1c.onrender.com/terms</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  <url>
+    <loc>https://rentit-frontend-gd1c.onrender.com/privacy-policy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  <url>
+    <loc>https://rentit-frontend-gd1c.onrender.com/cookie-policy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+</urlset>

@@ -1,0 +1,20 @@
+# RentIt -- public marketplace, so search engines should be able to browse
+# and index listings/search/legal pages. Everything under these paths
+# requires sign-in and has no SEO value (and some, like /messages, are
+# private), so they're excluded rather than left for crawlers to waste
+# budget on or accidentally surface in search results.
+User-agent: *
+Allow: /
+Disallow: /my-properties
+Disallow: /properties/new
+Disallow: /properties/*/edit
+Disallow: /properties/*/boost
+Disallow: /favorites
+Disallow: /verification
+Disallow: /messages
+Disallow: /saved-searches
+Disallow: /notification-preferences
+Disallow: /payment-history
+Disallow: /profile
+
+Sitemap: https://rentit-frontend-gd1c.onrender.com/sitemap.xml

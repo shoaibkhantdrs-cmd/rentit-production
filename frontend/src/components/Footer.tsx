@@ -25,7 +25,7 @@ const FOOTER_COLUMNS: { title: string; links: { label: string; href: string }[] 
       { label: "Help center", href: "/" },
       { label: "Contact us", href: "/contact" },
       { label: "Trust & safety", href: "/" },
-      { label: "Sitemap", href: "/" },
+      { label: "Sitemap", href: "/sitemap.xml" },
     ],
   },
   {
@@ -44,7 +44,10 @@ const FOOTER_COLUMNS: { title: string; links: { label: string; href: string }[] 
  * is a visual redesign, not authoring new legal/marketing pages. Terms of
  * service, Privacy policy, and Cookie policy are the exception -- those are
  * real pages (see App.tsx routes) because legal/compliance pages, unlike
- * marketing pages, were prioritized ahead of a public launch. */
+ * marketing pages, were prioritized ahead of a public launch. Sitemap
+ * likewise now points to a real, static /sitemap.xml (see frontend/public)
+ * rather than a React route -- it's a machine-readable resource for search
+ * engines, not a page a person browses to. */
 export function Footer() {
   return (
     <footer className="footer-v2">
