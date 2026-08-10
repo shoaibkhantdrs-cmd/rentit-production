@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { LazyMotion, MotionConfig } from "framer-motion";
 import App from "./App";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ChatProvider } from "@/context/ChatContext";
@@ -48,21 +49,28 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           `m`, so dropping `strict` costs nothing there -- it only removes
           an enforcement guard that was incompatible with the two
           intentionally-unconverted files. */}
-      <LazyMotion features={() => import("framer-motion").then((mod) => mod.domMax)}>
-        <MotionConfig reducedMotion="user">
-          <ThemeProvider>
-            <ToastProvider>
-              <AuthProvider>
-                <ChatProvider>
-                  <CompareProvider>
-                    <App />
-                  </CompareProvider>
-                </ChatProvider>
-              </AuthProvider>
-            </ToastProvider>
-          </ThemeProvider>
-        </MotionConfig>
-      </LazyMotion>
+      {/* Mounted around the whole provider tree (not just <App />) so a
+          crash inside any provider -- Theme/Toast/Auth/Chat/Compare -- is
+          caught too, not just crashes inside routed pages. See
+          ErrorBoundary.tsx for why its fallback UI deliberately avoids
+          depending on any of what it's wrapping. */}
+      <ErrorBoundary>
+        <LazyMotion features={() => import("framer-motion").then((mod) => mod.domMax)}>
+          <MotionConfig reducedMotion="user">
+            <ThemeProvider>
+              <ToastProvider>
+                <AuthProvider>
+                  <ChatProvider>
+                    <CompareProvider>
+                      <App />
+                    </CompareProvider>
+                  </ChatProvider>
+                </AuthProvider>
+              </ToastProvider>
+            </ThemeProvider>
+          </MotionConfig>
+        </LazyMotion>
+      </ErrorBoundary>
     </BrowserRouter>
   </React.StrictMode>,
 );
