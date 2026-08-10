@@ -86,7 +86,9 @@ export function PropertyDetailsPage() {
   const recommendations = useAsync(() => propertiesApi.recommendationsForProperty(id), [id]);
   const { showToast } = useToast();
 
-  useDocumentTitle(property ? `${property.title} in ${property.location.city}` : "Property");
+  useDocumentTitle(
+    property ? `${property.title}${property.location?.city ? ` in ${property.location.city}` : ""}` : "Property",
+  );
 
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [favoriteOverride, setFavoriteOverride] = useState<boolean | null>(null);
