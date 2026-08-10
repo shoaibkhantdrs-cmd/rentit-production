@@ -17,6 +17,31 @@
     <meta name="description" content="Search, list, and manage rental properties -- browse listings, message owners, and track applications." />
     <meta name="theme-color" content="#2563eb" />
 
+    <!-- Open Graph / Twitter Card: this is a client-rendered SPA (no SSR
+         or prerendering), so these tags are necessarily static/site-wide --
+         there's no way to serve a different og:title per listing without a
+         server-rendering layer, the same limitation already documented for
+         per-listing sitemap entries in robots.txt/sitemap.xml. What this
+         does fix is the common case: sharing the app itself (e.g. via the
+         in-app "Share via WhatsApp" feature's underlying links, or just
+         pasting rentit-frontend-gd1c.onrender.com into any chat app) --
+         before this, no og:/twitter: tags existed at all, so every shared
+         link previewed as a bare URL with no title, description, or image.
+         og:image reuses the existing 512x512 PWA icon rather than
+         commissioning a new banner asset; twitter:card is "summary" (not
+         "summary_large_image") because that icon is square, not a 1.91:1
+         banner. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="RentIt" />
+    <meta property="og:title" content="RentIt" />
+    <meta property="og:description" content="Search, list, and manage rental properties -- browse listings, message owners, and track applications." />
+    <meta property="og:url" content="https://rentit-frontend-gd1c.onrender.com/" />
+    <meta property="og:image" content="https://rentit-frontend-gd1c.onrender.com/icons/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="RentIt" />
+    <meta name="twitter:description" content="Search, list, and manage rental properties -- browse listings, message owners, and track applications." />
+    <meta name="twitter:image" content="https://rentit-frontend-gd1c.onrender.com/icons/icon-512.png" />
+
     <!-- Phase 6 Part 7 (mobile/PWA): favicon + PWA manifest + icons. -->
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="manifest" href="/manifest.webmanifest" />
