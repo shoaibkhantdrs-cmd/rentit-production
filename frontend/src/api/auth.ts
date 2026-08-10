@@ -35,6 +35,26 @@ export const authApi = {
 
   logout: (refreshToken: string) => httpClient.post<void>("/auth/logout", { refreshToken }, false),
 
+  /**
+   * The backend has always had a full forgot/reset-password flow
+   * (POST /auth/forgot-password + POST /auth/reset-password, both
+   * registered in auth.routes.ts and rate-limited same as
+   * login/register), but nothing in this file called either of them --
+   * this frontend's only real sign-in path is OTP (see requestLoginOtp/
+   * verifyLoginOtp above), so a "forgot password" link was never added
+   * alongside it. The gap that actually makes this a bug rather than
+   * dead code: the admin panel's "Reset password" button
+   * (UserDetailPage.tsx) calls adminApi.resetUserPassword, which
+   * triggers this exact same password_reset OTP server-side and emails
+   * the user a code -- with no page anywhere in the app for that user to
+   * enter it. These two functions close that gap.
+   */
+  forgotPassword: (input: { email: string }) =>
+    httpClient.post<{ message: string }>("/auth/forgot-password", input, false),
+
+  resetPassword: (input: { email: string; code: string; newPassword: string }) =>
+    httpClient.post<{ message: string }>("/auth/reset-password", input, false),
+
   logoutAll: () => httpClient.post<{ revokedSessions: number }>("/auth/logout-all", undefined, true),
 
   /**
