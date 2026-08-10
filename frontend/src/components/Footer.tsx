@@ -33,7 +33,7 @@ const FOOTER_COLUMNS: { title: string; links: { label: string; href: string }[] 
     links: [
       { label: "Terms of service", href: "/terms" },
       { label: "Privacy policy", href: "/privacy-policy" },
-      { label: "Cookie policy", href: "/" },
+      { label: "Cookie policy", href: "/cookie-policy" },
     ],
   },
 ];
@@ -41,7 +41,10 @@ const FOOTER_COLUMNS: { title: string; links: { label: string; href: string }[] 
 /** Premium marketplace footer -- new, shared across every public page via
  * Layout.tsx. Placeholder links (href="/") for pages that don't exist yet
  * (About/Careers/etc.) rather than 404s or dead '#' anchors, since the task
- * is a visual redesign, not authoring new legal/marketing pages. */
+ * is a visual redesign, not authoring new legal/marketing pages. Terms of
+ * service, Privacy policy, and Cookie policy are the exception -- those are
+ * real pages (see App.tsx routes) because legal/compliance pages, unlike
+ * marketing pages, were prioritized ahead of a public launch. */
 export function Footer() {
   return (
     <footer className="footer-v2">

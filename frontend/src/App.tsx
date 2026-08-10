@@ -38,6 +38,7 @@ const ProfilePage = lazyNamed(() => import("@/pages/ProfilePage"), "ProfilePage"
 const PrivacyPolicyPage = lazyNamed(() => import("@/pages/PrivacyPolicyPage"), "PrivacyPolicyPage");
 const TermsOfServicePage = lazyNamed(() => import("@/pages/TermsOfServicePage"), "TermsOfServicePage");
 const ContactPage = lazyNamed(() => import("@/pages/ContactPage"), "ContactPage");
+const CookiePolicyPage = lazyNamed(() => import("@/pages/CookiePolicyPage"), "CookiePolicyPage");
 
 function PageFallback() {
   return (
@@ -123,6 +124,7 @@ function App() {
         <Route path="/privacy-policy" element={<Lazy><PrivacyPolicyPage /></Lazy>} />
         <Route path="/terms" element={<Lazy><TermsOfServicePage /></Lazy>} />
         <Route path="/contact" element={<Lazy><ContactPage /></Lazy>} />
+        <Route path="/cookie-policy" element={<Lazy><CookiePolicyPage /></Lazy>} />
       </Route>
 
       <Route
