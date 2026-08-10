@@ -38,6 +38,7 @@ import { propertiesApi } from "@/api/properties";
 import { chatApi } from "@/api/chat";
 import { whatsappApi } from "@/api/whatsapp";
 import { useAsync } from "@/hooks/useAsync";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useAuth } from "@/context/AuthContext";
 import { ImageGallery } from "@/components/ImageGallery";
 import { PropertyCard } from "@/components/PropertyCard";
@@ -84,6 +85,8 @@ export function PropertyDetailsPage() {
   const { status, data: property, error, reload } = useAsync(() => propertiesApi.getById(id), [id]);
   const recommendations = useAsync(() => propertiesApi.recommendationsForProperty(id), [id]);
   const { showToast } = useToast();
+
+  useDocumentTitle(property ? `${property.title} in ${property.location.city}` : "Property");
 
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [favoriteOverride, setFavoriteOverride] = useState<boolean | null>(null);

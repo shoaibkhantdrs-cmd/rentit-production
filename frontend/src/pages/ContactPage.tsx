@@ -1,6 +1,7 @@
 import type React from "react";
 import { Mail, MessageCircle, ShieldAlert } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const bodyTextStyle: React.CSSProperties = {
   color: "var(--color-text-muted)",
@@ -39,6 +40,7 @@ const iconWrapStyle: React.CSSProperties = {
  * review).
  */
 export function ContactPage() {
+  useDocumentTitle("Contact & Support");
   return (
     <div>
       <div className="page-header">

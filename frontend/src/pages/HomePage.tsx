@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { propertiesApi } from "@/api/properties";
 import { useAsync } from "@/hooks/useAsync";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useAuth } from "@/context/AuthContext";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { PropertyCard } from "@/components/PropertyCard";
@@ -130,6 +131,7 @@ function CategoryStrip({ categories }: { categories: PropertyCategory[] }) {
 }
 
 export function HomePage() {
+  useDocumentTitle("Find your next place to rent");
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [city, setCity] = useState("");

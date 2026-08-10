@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { paymentsApi } from "@/api/payments";
 import { useAsync } from "@/hooks/useAsync";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ErrorState } from "@/components/ErrorState";
 import { ApiError } from "@/api/httpClient";
@@ -100,6 +101,7 @@ function PlanCard({ plan }: { plan: PremiumPlan }) {
 }
 
 function PremiumPlansList() {
+  useDocumentTitle("Premium Plans");
   const { status, data, error, reload } = useAsync(() => paymentsApi.plans(), []);
 
   return (

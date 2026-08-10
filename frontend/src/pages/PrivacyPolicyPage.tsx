@@ -1,5 +1,6 @@
 import type React from "react";
 import { Link } from "react-router-dom";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const sectionHeadingStyle: React.CSSProperties = {
   fontSize: "1.05rem",
@@ -32,6 +33,7 @@ const listStyle: React.CSSProperties = {
  * approved by RentIt's business/legal owner before public launch.
  */
 export function PrivacyPolicyPage() {
+  useDocumentTitle("Privacy Policy");
   return (
     <div>
       <div className="page-header">

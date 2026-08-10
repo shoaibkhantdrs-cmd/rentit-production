@@ -17,6 +17,7 @@ import {
 import { propertiesApi } from "@/api/properties";
 import { savedSearchesApi } from "@/api/savedSearches";
 import { useAsync } from "@/hooks/useAsync";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useAuth } from "@/context/AuthContext";
 import { PropertyCard } from "@/components/PropertyCard";
 import { PropertyGridSkeleton } from "@/components/Skeletons";
@@ -98,6 +99,7 @@ function bool(params: URLSearchParams, key: string): boolean | undefined {
 }
 
 export function SearchPage() {
+  useDocumentTitle("Search Properties");
   const { isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();

@@ -1,5 +1,6 @@
 import type React from "react";
 import { Link } from "react-router-dom";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const sectionHeadingStyle: React.CSSProperties = {
   fontSize: "1.05rem",
@@ -37,6 +38,7 @@ const listStyle: React.CSSProperties = {
  * three legal pages.
  */
 export function CookiePolicyPage() {
+  useDocumentTitle("Cookie Policy");
   return (
     <div>
       <div className="page-header">
