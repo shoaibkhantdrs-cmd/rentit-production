@@ -9,7 +9,7 @@ test("getMe returns the public profile, roles, and default preferences", async (
   const me = await c.getMe.execute(user.id);
 
   assert.equal(me.email, "me@example.com");
-  assert.deepEqual(me.roles, ["customer"]);
+  assert.deepEqual(me.roles, ["customer", "property_owner"]);
   assert.ok(me.preferences);
   assert.equal(me.preferences?.notifyEmail, true);
 });
