@@ -35,26 +35,18 @@ if (nodeEnv !== "development" && !process.env.JWT_ACCESS_SECRET) {
   );
 }
 
-// Same fail-closed rationale as the JWT guard above. RazorpayPaymentGateway
-// and StripePaymentGateway are both always constructed in container.ts
-// (see its "Phase 6 Part 1: payment gateways" comment) and both webhook
-// routes are always live in WebhookController, regardless of whether real
-// API keys are configured for either provider. If either secret is unset,
-// verifyWebhookSignature() HMACs against an empty string -- which anyone
-// can replicate without knowing any real secret -- so a forged request
-// (e.g. a fake payment.succeeded/refund.processed event) would verify as
-// genuine. "development" is the only environment where booting without a
-// real webhook secret is intentional.
-if (nodeEnv !== "development" && !process.env.RAZORPAY_WEBHOOK_SECRET) {
-  throw new Error(
-    `RAZORPAY_WEBHOOK_SECRET must be set when NODE_ENV is not "development" (got: "${nodeEnv}")`,
-  );
-}
-if (nodeEnv !== "development" && !process.env.STRIPE_WEBHOOK_SECRET) {
-  throw new Error(
-    `STRIPE_WEBHOOK_SECRET must be set when NODE_ENV is not "development" (got: "${nodeEnv}")`,
-  );
-}
+// Webhook secrets are deliberately NOT fail-closed at startup (unlike the
+// JWT guard above) -- RentIt needs to be able to run in production before
+// a real Razorpay/Stripe account exists, and neither provider's webhook
+// secret is required for the rest of the app to function (only for that
+// one provider's webhook endpoint). The security property this used to
+// enforce -- never accept a webhook signed against an empty-string secret
+// -- is instead enforced at the point of use: container.ts only wires up
+// a provider's webhook handler (HandlePaymentWebhookUseCase) when that
+// provider's secret is actually configured; WebhookController returns 503
+// for the other one instead of ever calling verifyWebhookSignature() with
+// an empty secret. See env.razorpay.webhookSecretConfigured /
+// env.stripe.webhookSecretConfigured below and WebhookController.ts.
 
 export const env = {
   nodeEnv,
@@ -189,12 +181,16 @@ export const env = {
     keyId: process.env.RAZORPAY_KEY_ID ?? "",
     keySecret: process.env.RAZORPAY_KEY_SECRET ?? "",
     webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
+    // Drives container.ts's decision to wire up (or safely disable) the
+    // Razorpay webhook handler -- see the comment above the guards.
+    webhookSecretConfigured: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET),
   },
 
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY ?? "",
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? "",
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+    webhookSecretConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
   },
 
   payments: {

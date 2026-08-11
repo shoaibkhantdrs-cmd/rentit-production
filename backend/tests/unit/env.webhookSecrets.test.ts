@@ -29,6 +29,16 @@ import path from "node:path";
 // single JSON line on stdout, rather than the parent trying to infer
 // pass/fail from the child's exit code or parsing stderr.
 //
+// RAZORPAY_WEBHOOK_SECRET/STRIPE_WEBHOOK_SECRET are deliberately NOT
+// fail-closed at startup (see env.ts's comment above razorpay/stripe
+// .webhookSecretConfigured) -- RentIt must be able to boot in production
+// before either payment provider's real webhook secret exists. Only
+// JWT_ACCESS_SECRET remains a hard startup requirement outside
+// "development". The security property this used to enforce at startup --
+// never accept a webhook signed against an empty-string secret -- is
+// enforced instead at the point of use: see WebhookController.test.ts for
+// the "unconfigured webhook is rejected, not silently accepted" coverage.
+//
 // No real secret values are used anywhere in this file -- only obviously
 // fake placeholder strings.
 
@@ -61,7 +71,9 @@ const CHILD_PROGRAM = `
       process.stdout.write(JSON.stringify({
         ok: true,
         razorpayWebhookSecret: modEnv.razorpay.webhookSecret,
+        razorpayWebhookSecretConfigured: modEnv.razorpay.webhookSecretConfigured,
         stripeWebhookSecret: modEnv.stripe.webhookSecret,
+        stripeWebhookSecretConfigured: modEnv.stripe.webhookSecretConfigured,
       }));
     })
     .catch((err) => {
@@ -83,7 +95,9 @@ interface ScenarioResult {
   ok: boolean;
   message?: string;
   razorpayWebhookSecret?: string;
+  razorpayWebhookSecretConfigured?: boolean;
   stripeWebhookSecret?: string;
+  stripeWebhookSecretConfigured?: boolean;
 }
 
 function runEnvInFreshProcess(scenario: Scenario): ScenarioResult {
@@ -110,27 +124,7 @@ function runEnvInFreshProcess(scenario: Scenario): ScenarioResult {
   return JSON.parse(stdout) as ScenarioResult;
 }
 
-test("A. production + missing RAZORPAY_WEBHOOK_SECRET fails closed", () => {
-  const result = runEnvInFreshProcess({
-    NODE_ENV: "production",
-    JWT_ACCESS_SECRET: "test-jwt-secret-value",
-    STRIPE_WEBHOOK_SECRET: "test-stripe-webhook-secret-value",
-  });
-  assert.equal(result.ok, false);
-  assert.match(result.message ?? "", /RAZORPAY_WEBHOOK_SECRET must be set/);
-});
-
-test("B. production + missing STRIPE_WEBHOOK_SECRET fails closed", () => {
-  const result = runEnvInFreshProcess({
-    NODE_ENV: "production",
-    JWT_ACCESS_SECRET: "test-jwt-secret-value",
-    RAZORPAY_WEBHOOK_SECRET: "test-razorpay-webhook-secret-value",
-  });
-  assert.equal(result.ok, false);
-  assert.match(result.message ?? "", /STRIPE_WEBHOOK_SECRET must be set/);
-});
-
-test("C. production + missing JWT_ACCESS_SECRET still fails (existing behavior unchanged)", () => {
+test("A. production + missing JWT_ACCESS_SECRET still fails closed (unchanged behavior)", () => {
   const result = runEnvInFreshProcess({
     NODE_ENV: "production",
     RAZORPAY_WEBHOOK_SECRET: "test-razorpay-webhook-secret-value",
@@ -140,7 +134,29 @@ test("C. production + missing JWT_ACCESS_SECRET still fails (existing behavior u
   assert.match(result.message ?? "", /JWT_ACCESS_SECRET must be set/);
 });
 
-test("D. production + all three secrets configured succeeds with the correct values", () => {
+test("B. production + no Razorpay webhook secret: env loads successfully, reported as not configured", () => {
+  const result = runEnvInFreshProcess({
+    NODE_ENV: "production",
+    JWT_ACCESS_SECRET: "test-jwt-secret-value",
+    STRIPE_WEBHOOK_SECRET: "test-stripe-webhook-secret-value",
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.razorpayWebhookSecret, "");
+  assert.equal(result.razorpayWebhookSecretConfigured, false);
+});
+
+test("C. production + no Stripe webhook secret: env loads successfully, reported as not configured", () => {
+  const result = runEnvInFreshProcess({
+    NODE_ENV: "production",
+    JWT_ACCESS_SECRET: "test-jwt-secret-value",
+    RAZORPAY_WEBHOOK_SECRET: "test-razorpay-webhook-secret-value",
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.stripeWebhookSecret, "");
+  assert.equal(result.stripeWebhookSecretConfigured, false);
+});
+
+test("D. production + Razorpay webhook secret configured: existing configuration works", () => {
   const result = runEnvInFreshProcess({
     NODE_ENV: "production",
     JWT_ACCESS_SECRET: "test-jwt-secret-value",
@@ -149,24 +165,36 @@ test("D. production + all three secrets configured succeeds with the correct val
   });
   assert.equal(result.ok, true);
   assert.equal(result.razorpayWebhookSecret, "test-razorpay-webhook-secret-value");
-  assert.equal(result.stripeWebhookSecret, "test-stripe-webhook-secret-value");
+  assert.equal(result.razorpayWebhookSecretConfigured, true);
 });
 
-test("E. development + webhook/JWT secrets unset succeeds via the existing dev fallback", () => {
+test("E. production + Stripe webhook secret configured: existing configuration works", () => {
+  const result = runEnvInFreshProcess({
+    NODE_ENV: "production",
+    JWT_ACCESS_SECRET: "test-jwt-secret-value",
+    RAZORPAY_WEBHOOK_SECRET: "test-razorpay-webhook-secret-value",
+    STRIPE_WEBHOOK_SECRET: "test-stripe-webhook-secret-value",
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.stripeWebhookSecret, "test-stripe-webhook-secret-value");
+  assert.equal(result.stripeWebhookSecretConfigured, true);
+});
+
+test("F. development + webhook/JWT secrets unset succeeds via the existing dev fallback", () => {
   // NODE_ENV is deliberately left out of the scenario entirely here, not
   // set to the literal string "development" -- env.ts's own default for a
   // genuinely *unset* NODE_ENV is "development" (`process.env.NODE_ENV ??
   // "development"`), and that unset case -- a bare local-dev checkout with
   // no .env file at all -- is exactly what this scenario needs to cover.
-  // This does not assert or rely on unset NODE_ENV failing closed; it
-  // asserts the opposite, matching env.ts's current, unchanged behavior.
   const result = runEnvInFreshProcess({});
   assert.equal(result.ok, true);
   assert.equal(result.razorpayWebhookSecret, "");
+  assert.equal(result.razorpayWebhookSecretConfigured, false);
   assert.equal(result.stripeWebhookSecret, "");
+  assert.equal(result.stripeWebhookSecretConfigured, false);
 });
 
-test("F. development + explicit fake placeholder secrets are exposed unchanged", () => {
+test("G. development + explicit fake placeholder secrets are exposed unchanged", () => {
   const result = runEnvInFreshProcess({
     NODE_ENV: "development",
     RAZORPAY_WEBHOOK_SECRET: "dev-razorpay-webhook-secret",
@@ -174,5 +202,7 @@ test("F. development + explicit fake placeholder secrets are exposed unchanged",
   });
   assert.equal(result.ok, true);
   assert.equal(result.razorpayWebhookSecret, "dev-razorpay-webhook-secret");
+  assert.equal(result.razorpayWebhookSecretConfigured, true);
   assert.equal(result.stripeWebhookSecret, "dev-stripe-webhook-secret");
+  assert.equal(result.stripeWebhookSecretConfigured, true);
 });

@@ -14,11 +14,21 @@ import { HandlePaymentWebhookUseCase } from "@/application/payments/HandlePaymen
  */
 export class WebhookController {
   constructor(
-    private readonly handleRazorpayWebhook: HandlePaymentWebhookUseCase,
-    private readonly handleStripeWebhook: HandlePaymentWebhookUseCase,
+    // null when the corresponding provider's webhook secret isn't
+    // configured (see container.ts) -- there is deliberately no gateway
+    // call in that case, not even verifyWebhookSignature(), because that
+    // would HMAC against an empty-string secret that anyone could
+    // replicate. The endpoint stays safely unavailable until a real
+    // secret is set, rather than the whole app failing to start.
+    private readonly handleRazorpayWebhook: HandlePaymentWebhookUseCase | null,
+    private readonly handleStripeWebhook: HandlePaymentWebhookUseCase | null,
   ) {}
 
   razorpay = async (req: Request, res: Response): Promise<void> => {
+    if (!this.handleRazorpayWebhook) {
+      res.status(503).json({ received: false, reason: "razorpay_webhook_not_configured" });
+      return;
+    }
     if (!req.rawBody) {
       res.status(400).json({ received: false });
       return;
@@ -36,6 +46,10 @@ export class WebhookController {
   };
 
   stripe = async (req: Request, res: Response): Promise<void> => {
+    if (!this.handleStripeWebhook) {
+      res.status(503).json({ received: false, reason: "stripe_webhook_not_configured" });
+      return;
+    }
     if (!req.rawBody) {
       res.status(400).json({ received: false });
       return;

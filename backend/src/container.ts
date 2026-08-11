@@ -739,26 +739,34 @@ export function buildContainer() {
   // Two instances of the same use-case class, one per gateway -- see
   // HandlePaymentWebhook.usecase.ts's doc comment for why the branching
   // logic itself isn't duplicated per provider.
-  const handleRazorpayWebhook = new HandlePaymentWebhookUseCase(
-    razorpayGateway,
-    webhookEventRepo,
-    paymentOrderRepo,
-    paymentRepo,
-    refundRepo,
-    invoiceRepo,
-    paymentActivator,
-    logger,
-  );
-  const handleStripeWebhook = new HandlePaymentWebhookUseCase(
-    stripeGateway,
-    webhookEventRepo,
-    paymentOrderRepo,
-    paymentRepo,
-    refundRepo,
-    invoiceRepo,
-    paymentActivator,
-    logger,
-  );
+  // Only wired up when that provider's webhook secret is actually
+  // configured -- see env.ts's comment above razorpay/stripe.
+  // webhookSecretConfigured. WebhookController returns 503 for the null
+  // case instead of ever verifying a signature against an empty secret.
+  const handleRazorpayWebhook = env.razorpay.webhookSecretConfigured
+    ? new HandlePaymentWebhookUseCase(
+        razorpayGateway,
+        webhookEventRepo,
+        paymentOrderRepo,
+        paymentRepo,
+        refundRepo,
+        invoiceRepo,
+        paymentActivator,
+        logger,
+      )
+    : null;
+  const handleStripeWebhook = env.stripe.webhookSecretConfigured
+    ? new HandlePaymentWebhookUseCase(
+        stripeGateway,
+        webhookEventRepo,
+        paymentOrderRepo,
+        paymentRepo,
+        refundRepo,
+        invoiceRepo,
+        paymentActivator,
+        logger,
+      )
+    : null;
 
   const adminRefundPayment = new AdminRefundPaymentUseCase(
     paymentRepo,
