@@ -35,6 +35,7 @@ import {
   Zap,
 } from "lucide-react";
 import { propertiesApi } from "@/api/properties";
+import { usersApi } from "@/api/users";
 import { chatApi } from "@/api/chat";
 import { whatsappApi } from "@/api/whatsapp";
 import { useAsync } from "@/hooks/useAsync";
@@ -56,6 +57,20 @@ const REPORT_REASONS = [
   { value: "duplicate_listing", label: "Duplicate listing" },
   { value: "offensive_content", label: "Offensive content" },
   { value: "already_rented", label: "Already rented" },
+  { value: "other", label: "Other" },
+];
+
+// Separate from REPORT_REASONS above -- these are the literal values
+// reportUserSchema (backend) accepts for reporting the *owner*, not the
+// listing. Kept as its own list rather than reusing REPORT_REASONS since
+// the two schemas' enums don't match (e.g. "harassment"/"fake_profile" are
+// user-report-only; "duplicate_listing"/"already_rented" are listing-only).
+const USER_REPORT_REASONS = [
+  { value: "spam", label: "Spam" },
+  { value: "harassment", label: "Harassment" },
+  { value: "fraud", label: "Fraud" },
+  { value: "fake_profile", label: "Fake profile" },
+  { value: "inappropriate_behavior", label: "Inappropriate behavior" },
   { value: "other", label: "Other" },
 ];
 
@@ -96,6 +111,14 @@ export function PropertyDetailsPage() {
   const [reportReason, setReportReason] = useState(REPORT_REASONS[0].value);
   const [reportDetails, setReportDetails] = useState("");
   const [reportStatus, setReportStatus] = useState<"idle" | "sending" | "sent">("idle");
+  // Separate from the listing-report state above -- reports the owner
+  // (POST /users/:id/report) rather than the listing (POST
+  // /properties/:id/report). Kept fully independent so opening one form
+  // never affects the other's state.
+  const [showReportOwnerForm, setShowReportOwnerForm] = useState(false);
+  const [reportOwnerReason, setReportOwnerReason] = useState(USER_REPORT_REASONS[0].value);
+  const [reportOwnerDetails, setReportOwnerDetails] = useState("");
+  const [reportOwnerStatus, setReportOwnerStatus] = useState<"idle" | "sending" | "sent">("idle");
   const [deleting, setDeleting] = useState(false);
   const [messageBusy, setMessageBusy] = useState(false);
   const [whatsappBusy, setWhatsappBusy] = useState<"contact" | "inquiry" | "share" | "visit" | null>(null);
@@ -175,6 +198,27 @@ export function PropertyDetailsPage() {
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : "Could not submit report.", "error");
       setReportStatus("idle");
+    }
+  };
+
+  // Reports the owner (POST /users/:id/report via usersApi.report), not the
+  // listing -- same auth guard and ApiError handling as submitReport above,
+  // since this backend endpoint has the identical "authenticated users
+  // only" requirement (see UserController.report -> UnauthorizedError).
+  const submitReportOwner = async () => {
+    if (!property.owner) return;
+    if (!isAuthenticated) {
+      showToast("Sign in to report this user.", "info");
+      return;
+    }
+    setReportOwnerStatus("sending");
+    try {
+      await usersApi.report(property.owner.id, reportOwnerReason, reportOwnerDetails.trim() || undefined);
+      setReportOwnerStatus("sent");
+      showToast("Thanks -- your report has been submitted.", "success");
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "Could not submit report.", "error");
+      setReportOwnerStatus("idle");
     }
   };
 
@@ -537,6 +581,61 @@ export function PropertyDetailsPage() {
               <div className="owner-card-v2__meta">Listed on RentIt</div>
             </div>
           </div>
+
+          {/* Report the owner, distinct from "Report this listing" further
+              below -- this is about the person (spam/harassment/fraud/fake
+              profile/inappropriate behavior), not the listing content, so it
+              sits right under the owner's name/avatar rather than beside the
+              listing-report action. Kept as a plain text link (not a full
+              btn-v2) so it doesn't visually compete with the primary
+              Message/Call/WhatsApp owner actions below it -- it's a
+              same-tier action to "Show Number", not a primary CTA. */}
+          {!canManage && property.owner ? (
+            <div style={{ marginBottom: 10 }}>
+              {!showReportOwnerForm ? (
+                <button type="button" className="link-button" onClick={() => setShowReportOwnerForm(true)}>
+                  <Flag size={12} style={{ marginRight: 4, verticalAlign: "-1px" }} />
+                  Report this user
+                </button>
+              ) : reportOwnerStatus === "sent" ? (
+                <div className="alert alert--success">Thanks -- your report has been submitted.</div>
+              ) : (
+                <div>
+                  <div className="field">
+                    <label htmlFor="report-owner-reason">Reason</label>
+                    <select
+                      id="report-owner-reason"
+                      value={reportOwnerReason}
+                      onChange={(e) => setReportOwnerReason(e.target.value)}
+                    >
+                      {USER_REPORT_REASONS.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="report-owner-details">Details (optional)</label>
+                    <textarea
+                      id="report-owner-details"
+                      value={reportOwnerDetails}
+                      onChange={(e) => setReportOwnerDetails(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-v2 btn-v2--primary btn-v2--sm"
+                    style={{ width: "100%" }}
+                    onClick={submitReportOwner}
+                    disabled={reportOwnerStatus === "sending"}
+                  >
+                    {reportOwnerStatus === "sending" ? "Submitting..." : "Submit report"}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
 
           {!canManage && property.owner ? (
             <div style={{ marginBottom: 10 }}>

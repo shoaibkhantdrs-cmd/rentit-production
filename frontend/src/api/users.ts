@@ -45,4 +45,13 @@ export const usersApi = {
    * backend's DEV_OTP_MODE is on (see UserController.requestPhoneOtpHandler
    * / OtpIssuer.issue()), so real Twilio delivery is completely unaffected. */
   requestPhoneOtp: () => httpClient.post<{ message: string; otp?: string }>("/users/me/phone/otp"),
+
+  /** Self-service "report a user" (POST /users/:id/report, backed by
+   * ReportUserUseCase -- "Phase 4 Part 4... any authenticated user"). The
+   * route and validator (reportUserSchema) already existed; nothing in the
+   * frontend called it. Mirrors propertiesApi.report's shape exactly
+   * (id, reason, optional details -> { message }) since it's the same
+   * report-and-acknowledge pattern already used for listings. */
+  report: (userId: string, reason: string, details?: string) =>
+    httpClient.post<{ message: string }>(`/users/${userId}/report`, { reason, details }),
 };
