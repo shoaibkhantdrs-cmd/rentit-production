@@ -135,7 +135,7 @@ test("D. production + all three secrets configured succeeds with the correct val
     RAZORPAY_WEBHOOK_SECRET: "test-razorpay-webhook-secret-value",
     STRIPE_WEBHOOK_SECRET: "test-stripe-webhook-secret-value",
   });
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, true, result.message);
   assert.equal(result.razorpayWebhookSecret, "test-razorpay-webhook-secret-value");
   assert.equal(result.stripeWebhookSecret, "test-stripe-webhook-secret-value");
 });
@@ -149,7 +149,7 @@ test("E. development + webhook/JWT secrets unset succeeds via the existing dev f
   // This does not assert or rely on unset NODE_ENV failing closed; it
   // asserts the opposite, matching env.ts's current, unchanged behavior.
   const result = runEnvInFreshProcess({});
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, true, result.message);
   assert.equal(result.razorpayWebhookSecret, "");
   assert.equal(result.stripeWebhookSecret, "");
 });
@@ -160,7 +160,7 @@ test("F. development + explicit fake placeholder secrets are exposed unchanged",
     RAZORPAY_WEBHOOK_SECRET: "dev-razorpay-webhook-secret",
     STRIPE_WEBHOOK_SECRET: "dev-stripe-webhook-secret",
   });
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, true, result.message);
   assert.equal(result.razorpayWebhookSecret, "dev-razorpay-webhook-secret");
   assert.equal(result.stripeWebhookSecret, "dev-stripe-webhook-secret");
 });
