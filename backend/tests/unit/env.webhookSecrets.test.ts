@@ -46,10 +46,22 @@ const CHILD_PROGRAM = `
   const { pathToFileURL } = require("node:url");
   import(pathToFileURL(process.env.ENV_TS_PATH_FOR_TEST).href)
     .then((mod) => {
+      // env.ts has no "type": "module" in backend/package.json, so tsx (like
+      // tsc under this project's "module": "Node16" tsconfig) transpiles it
+      // to CommonJS, not native ESM. When a CommonJS module is loaded via
+      // dynamic import(), Node exposes the whole module.exports object as
+      // \`.default\` -- named-property access off the namespace object
+      // itself (\`mod.env\`) additionally works only if Node's static
+      // cjs-module-lexer scan of the compiled output happens to detect
+      // \`env\` as an export, which isn't guaranteed for every CJS output
+      // shape a bundler/transpiler can produce. Reading through \`.default\`
+      // first is the interop path that's always correct for a CJS module
+      // regardless of that detection step.
+      const modEnv = (mod.default && mod.default.env) || mod.env;
       process.stdout.write(JSON.stringify({
         ok: true,
-        razorpayWebhookSecret: mod.env.razorpay.webhookSecret,
-        stripeWebhookSecret: mod.env.stripe.webhookSecret,
+        razorpayWebhookSecret: modEnv.razorpay.webhookSecret,
+        stripeWebhookSecret: modEnv.stripe.webhookSecret,
       }));
     })
     .catch((err) => {
@@ -135,7 +147,7 @@ test("D. production + all three secrets configured succeeds with the correct val
     RAZORPAY_WEBHOOK_SECRET: "test-razorpay-webhook-secret-value",
     STRIPE_WEBHOOK_SECRET: "test-stripe-webhook-secret-value",
   });
-  assert.equal(result.ok, true, result.message);
+  assert.equal(result.ok, true);
   assert.equal(result.razorpayWebhookSecret, "test-razorpay-webhook-secret-value");
   assert.equal(result.stripeWebhookSecret, "test-stripe-webhook-secret-value");
 });
@@ -149,7 +161,7 @@ test("E. development + webhook/JWT secrets unset succeeds via the existing dev f
   // This does not assert or rely on unset NODE_ENV failing closed; it
   // asserts the opposite, matching env.ts's current, unchanged behavior.
   const result = runEnvInFreshProcess({});
-  assert.equal(result.ok, true, result.message);
+  assert.equal(result.ok, true);
   assert.equal(result.razorpayWebhookSecret, "");
   assert.equal(result.stripeWebhookSecret, "");
 });
@@ -160,7 +172,7 @@ test("F. development + explicit fake placeholder secrets are exposed unchanged",
     RAZORPAY_WEBHOOK_SECRET: "dev-razorpay-webhook-secret",
     STRIPE_WEBHOOK_SECRET: "dev-stripe-webhook-secret",
   });
-  assert.equal(result.ok, true, result.message);
+  assert.equal(result.ok, true);
   assert.equal(result.razorpayWebhookSecret, "dev-razorpay-webhook-secret");
   assert.equal(result.stripeWebhookSecret, "dev-stripe-webhook-secret");
 });
