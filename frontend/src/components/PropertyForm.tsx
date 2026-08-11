@@ -766,8 +766,27 @@ export function PropertyForm({ initial, submitLabel, onSubmit }: PropertyFormPro
             <input id="pf-locality" readOnly value={values.location.locality ?? ""} placeholder="Auto-filled from PIN code" />
           </div>
           <div className="field">
-            <label htmlFor="pf-city">City</label>
-            <input id="pf-city" readOnly value={values.location.city} placeholder="Auto-filled from PIN code" />
+            {/* Bug fix (same production bug as AddPropertyPage.tsx's wizard
+                Address step -- see that file's comment on w-city for the
+                full rationale): PIN-code geocoding doesn't always resolve a
+                city, and the backend hard-requires location.city to be at
+                least 2 characters. This field was permanently readOnly with
+                no onChange, so there was no way to fix that on Edit either.
+                Now genuinely editable (still auto-fills the same way when
+                geocoding succeeds); required/minLength mirror the existing
+                native-HTML5-validation pattern already used by pf-address
+                above rather than introducing a new inline-error style. */}
+            <label htmlFor="pf-city">
+              City <RequiredMark />
+            </label>
+            <input
+              id="pf-city"
+              required
+              minLength={2}
+              value={values.location.city}
+              onChange={(e) => updateLocation("city", e.target.value)}
+              placeholder="Auto-filled from PIN code -- edit if missing or incorrect"
+            />
           </div>
           <div className="field">
             <label htmlFor="pf-district">District</label>

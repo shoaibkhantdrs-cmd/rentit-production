@@ -340,6 +340,52 @@ function PropertyWizard() {
       return { ...prev, suitableFor: current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag] };
     });
 
+  // Bug fix (live E2E production verification, Bug #2): the wizard's
+  // localStorage draft (DRAFT_KEY) is a single flat WizardValues object
+  // shared across every propertyType. Switching type used to leave the
+  // previous type's type-specific fields sitting untouched in `values`
+  // (and thus in the persisted draft) -- e.g. a Shop draft's
+  // frontWidthFt/shopDepthFt/roadWidthFt/powerLoad/isCornerShop/
+  // hasWashroom/readyToMove/suitableFor survived a switch to "apartment"
+  // and got submitted anyway, which the backend correctly rejects (a
+  // non-shop property can't carry shop fields -- see task #377).
+  //
+  // These 8 fields (per CreatePropertyPayload in api/types.ts) are the
+  // only ones that are actually shop-specific today; everything else
+  // (title, address, pricing, amenities, floorNumber/totalFloors, etc.)
+  // is genuinely shared across every property type and is intentionally
+  // left untouched here. Switching *into* "shop" needs no special
+  // handling: those 8 fields are already undefined for any non-shop
+  // draft, so there's nothing stale to inherit in that direction.
+  const clearShopOnlyFields = (v: WizardValues): WizardValues => ({
+    ...v,
+    frontWidthFt: undefined,
+    shopDepthFt: undefined,
+    roadWidthFt: undefined,
+    powerLoad: undefined,
+    isCornerShop: undefined,
+    hasWashroom: undefined,
+    readyToMove: undefined,
+    suitableFor: undefined,
+  });
+
+  const handlePropertyTypeChange = (nextType: PropertyType) => {
+    if (locked) return;
+    setValues((prev) => {
+      const next = { ...prev, propertyType: nextType };
+      return nextType === "shop" ? next : clearShopOnlyFields(next);
+    });
+    if (nextType !== "shop") {
+      // These three shadow-text states (see rentText/frontWidthText etc.
+      // above) aren't part of `values` at all, so clearing the real field
+      // above doesn't touch them -- without this they'd keep showing the
+      // old Shop draft's digits if the user ever switched back to "shop".
+      setFrontWidthText("");
+      setShopDepthText("");
+      setRoadWidthText("");
+    }
+  };
+
   const digitsOnly = (raw: string) => raw.replace(/[^0-9]/g, "");
 
   // Shared onChange for the Pricing & size numeric fields: strips anything
@@ -585,11 +631,18 @@ function PropertyWizard() {
       // Phase 2 Part 1 validation (spec item 13): PIN required, Address
       // Line required, and a marker must be placed (latitude/longitude
       // both set) before the user can continue -- either from a resolved
-      // PIN lookup, a dragged marker, or "Use current location".
+      // PIN lookup, a dragged marker, or "Use current location". City is
+      // also required here (bug fix, live E2E production verification):
+      // the backend's createPropertySchema rejects location.city under 2
+      // characters regardless, so gating Next on it here surfaces that as
+      // an inline "City must be at least 2 characters" message on this
+      // step instead of a generic "Validation failed" banner only
+      // discovered after the whole wizard is filled out.
       case 1:
         return (
           Boolean(values.location.postalCode?.trim()) &&
           values.location.addressLine.trim().length >= 5 &&
+          values.location.city.trim().length >= 2 &&
           values.location.latitude !== undefined &&
           values.location.longitude !== undefined
         );
@@ -773,7 +826,7 @@ function PropertyWizard() {
                 <label>Property type</label>
                 <div className="chip-row">
                   {PROPERTY_TYPES.map((t) => (
-                    <Chip key={t} active={values.propertyType === t} onClick={() => !locked && update("propertyType", t)}>
+                    <Chip key={t} active={values.propertyType === t} onClick={() => !locked && handlePropertyTypeChange(t)}>
                       {t}
                     </Chip>
                   ))}
@@ -874,17 +927,42 @@ function PropertyWizard() {
               ) : null}
             </div>
 
-            {/* Country/State/District/City are auto-filled only -- never
+            {/* Locality/District/State/Country are auto-filled only -- never
                 manually typed (spec item 5). Read-only rather than removed
-                entirely so the user can see and trust what was resolved. */}
+                entirely so the user can see and trust what was resolved.
+                City is the one exception (bug fix, live E2E production
+                verification): Nominatim's PIN lookup doesn't always resolve
+                a city (confirmed reproducible for PIN 226001/Lucknow), and
+                the backend hard-requires location.city to be at least 2
+                characters -- leaving it permanently readOnly made it
+                impossible to ever list a property at such a PIN. The field
+                still gets auto-filled the same way when geocoding does
+                return a city, but it's now a genuinely editable input so
+                the user can type or correct it either way. */}
             <div className="form-grid">
               <div className="field">
                 <label htmlFor="w-locality">Locality</label>
                 <input id="w-locality" readOnly disabled={locked} value={values.location.locality ?? ""} placeholder="Auto-filled from PIN code" />
               </div>
               <div className="field">
-                <label htmlFor="w-city">City</label>
-                <input id="w-city" readOnly disabled={locked} value={values.location.city} placeholder="Auto-filled from PIN code" />
+                <label htmlFor="w-city">
+                  City <RequiredMark />
+                </label>
+                <input
+                  id="w-city"
+                  required
+                  disabled={locked}
+                  value={values.location.city}
+                  onChange={(e) => updateLocation("city", e.target.value)}
+                  placeholder="Auto-filled from PIN code -- edit if missing or incorrect"
+                />
+                {!locked && values.location.city.trim().length > 0 && values.location.city.trim().length < 2 ? (
+                  <span className="field-error">City must be at least 2 characters.</span>
+                ) : !locked && pinLookupStatus !== "idle" && values.location.city.trim().length === 0 ? (
+                  <span className="field-error">
+                    City is required. This PIN code didn't auto-fill one -- please type it in manually.
+                  </span>
+                ) : null}
               </div>
               <div className="field">
                 <label htmlFor="w-district">District</label>
