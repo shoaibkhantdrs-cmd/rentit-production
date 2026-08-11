@@ -41,6 +41,12 @@ jobs:
     env:
       DATABASE_URL: postgresql://rentit_ci:rentit_ci_password@localhost:5432/rentit_ci
       JWT_ACCESS_SECRET: ci-test-secret-not-used-in-production
+      # CI-only placeholders so env.ts's fail-closed webhook-secret guard
+      # (added in 493c4a8) doesn't throw at module load under NODE_ENV=test.
+      # Not real Razorpay/Stripe credentials -- never used to verify an
+      # actual webhook, only to satisfy the "is a secret configured" check.
+      RAZORPAY_WEBHOOK_SECRET: ci-test-secret-not-used-in-production
+      STRIPE_WEBHOOK_SECRET: ci-test-secret-not-used-in-production
       NODE_ENV: test
     defaults:
       run:
