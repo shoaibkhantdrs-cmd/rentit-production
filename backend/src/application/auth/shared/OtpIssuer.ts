@@ -80,7 +80,11 @@ export class OtpIssuer {
     const isDevSmsBypass = channel === "sms" && this.config.devOtpMode;
 
     if (isDevSmsBypass) {
-      // eslint-disable-next-line no-console -- intentional: explicit dev-mode OTP visibility, not app logging
+      // Intentional: explicit dev-mode OTP visibility, not app logging. No
+      // `no-console` ESLint rule is enabled in this project's config (see
+      // backend/.eslintrc.cjs), so no disable directive is needed here --
+      // one was previously present but flagged as unused by CI's
+      // --report-unused-disable-directives check.
       console.log(`[DEV OTP] ${purpose} code for user ${user.id} (${destination}): ${code}`);
     } else {
       // Bug fix: this call previously had no error handling at all. A
