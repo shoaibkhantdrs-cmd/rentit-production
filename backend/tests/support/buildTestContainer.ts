@@ -123,6 +123,8 @@ export function buildTestContainer(otpCode = "123456", authConfig: AuthConfig = 
       clock,
       sessionIssuer,
       otpIssuer,
+      roleRepo,
+      userPreferenceRepo,
     ),
     verifyOtp: new VerifyOtpUseCase(
       userRepo,
