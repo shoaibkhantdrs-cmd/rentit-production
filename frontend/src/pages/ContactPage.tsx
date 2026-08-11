@@ -34,11 +34,22 @@ const iconWrapStyle: React.CSSProperties = {
  * email or phone number exists anywhere in this repository (the only email
  * value present in code is `no-reply@rentit.example`, a transactional
  * "from" address default, not a real support inbox) -- so the direct-email
- * contact method is shown as a clearly bracketed placeholder rather than
- * invented. The in-app reporting mechanism referenced below reflects real,
- * existing product functionality (users can report listings/users for
- * review).
+ * contact method was originally shown as a clearly bracketed placeholder
+ * rather than invented. The in-app reporting mechanism referenced below
+ * reflects real, existing product functionality (users can report
+ * listings/users for review).
+ *
+ * SUPPORT_EMAIL below is a temporary real inbox, not a permanent one --
+ * PrivacyPolicyPage.tsx tells users they can request account/data deletion
+ * "by contacting us using the details on our Contact page", so this page
+ * needs an actual working channel, not a placeholder, for that promise to
+ * be true. Single named constant so swapping in RentIt's eventual official
+ * support address is a one-line change here (nothing else on this page or
+ * PrivacyPolicyPage.tsx hardcodes the address -- Privacy Policy links to
+ * this page rather than duplicating the email).
  */
+const SUPPORT_EMAIL = "shoaibdmx786@gmail.com";
+
 export function ContactPage() {
   useDocumentTitle("Contact & Support");
   return (
@@ -63,7 +74,8 @@ export function ContactPage() {
             <div>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>Email support</div>
               <p style={bodyTextStyle}>
-                For account, billing, or general questions, email us at [SUPPORT EMAIL].
+                For account, billing, general questions, or to request deletion of your account and
+                data, email us at <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
               </p>
             </div>
           </div>
