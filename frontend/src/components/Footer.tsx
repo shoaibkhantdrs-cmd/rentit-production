@@ -13,10 +13,10 @@ const FOOTER_COLUMNS: { title: string; links: { label: string; href: string }[] 
   {
     title: "Company",
     links: [
-      { label: "About RentIt", href: "/" },
-      { label: "Careers", href: "/" },
-      { label: "Press", href: "/" },
-      { label: "Blog", href: "/" },
+      { label: "About RentIt", href: "/about" },
+      { label: "Careers", href: "/careers" },
+      { label: "Press", href: "/press" },
+      { label: "Blog", href: "/blog" },
     ],
   },
   {
@@ -39,15 +39,17 @@ const FOOTER_COLUMNS: { title: string; links: { label: string; href: string }[] 
 ];
 
 /** Premium marketplace footer -- new, shared across every public page via
- * Layout.tsx. Placeholder links (href="/") for pages that don't exist yet
- * (About/Careers/etc.) rather than 404s or dead '#' anchors, since the task
- * is a visual redesign, not authoring new legal/marketing pages. Terms of
- * service, Privacy policy, and Cookie policy are the exception -- those are
- * real pages (see App.tsx routes) because legal/compliance pages, unlike
- * marketing pages, were prioritized ahead of a public launch. Sitemap
- * likewise now points to a real, static /sitemap.xml (see frontend/public)
- * rather than a React route -- it's a machine-readable resource for search
- * engines, not a page a person browses to. */
+ * Layout.tsx. Pre-launch footer-links audit: the COMPANY column (About/
+ * Careers/Press/Blog) previously all pointed at href="/" as placeholders --
+ * now real pages (see App.tsx routes: /about, /careers, /press, /blog).
+ * Help center / Trust & safety under Support remain placeholder href="/"
+ * since they're out of scope for this audit (only the COMPANY column was
+ * requested). Terms of service, Privacy policy, and Cookie policy are real
+ * pages (see App.tsx routes) because legal/compliance pages were
+ * prioritized ahead of a public launch. Sitemap likewise points to a real,
+ * static /sitemap.xml (see frontend/public) rather than a React route --
+ * it's a machine-readable resource for search engines, not a page a person
+ * browses to. */
 export function Footer() {
   return (
     <footer className="footer-v2">

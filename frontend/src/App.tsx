@@ -39,6 +39,14 @@ const PrivacyPolicyPage = lazyNamed(() => import("@/pages/PrivacyPolicyPage"), "
 const TermsOfServicePage = lazyNamed(() => import("@/pages/TermsOfServicePage"), "TermsOfServicePage");
 const ContactPage = lazyNamed(() => import("@/pages/ContactPage"), "ContactPage");
 const CookiePolicyPage = lazyNamed(() => import("@/pages/CookiePolicyPage"), "CookiePolicyPage");
+// Pre-launch footer audit: the COMPANY footer column (About/Careers/Press/
+// Blog) previously linked all four to href="/" -- these are the real pages
+// that fix that. Same lazy-split treatment as the legal pages above, since
+// none of these are a cold direct-load target either.
+const AboutPage = lazyNamed(() => import("@/pages/AboutPage"), "AboutPage");
+const CareersPage = lazyNamed(() => import("@/pages/CareersPage"), "CareersPage");
+const PressPage = lazyNamed(() => import("@/pages/PressPage"), "PressPage");
+const BlogPage = lazyNamed(() => import("@/pages/BlogPage"), "BlogPage");
 
 function PageFallback() {
   return (
@@ -125,6 +133,10 @@ function App() {
         <Route path="/terms" element={<Lazy><TermsOfServicePage /></Lazy>} />
         <Route path="/contact" element={<Lazy><ContactPage /></Lazy>} />
         <Route path="/cookie-policy" element={<Lazy><CookiePolicyPage /></Lazy>} />
+        <Route path="/about" element={<Lazy><AboutPage /></Lazy>} />
+        <Route path="/careers" element={<Lazy><CareersPage /></Lazy>} />
+        <Route path="/press" element={<Lazy><PressPage /></Lazy>} />
+        <Route path="/blog" element={<Lazy><BlogPage /></Lazy>} />
       </Route>
 
       <Route
